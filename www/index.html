@@ -1,0 +1,76 @@
+<html>
+   <head>
+      <meta http-equiv="Content-Security-Policy"
+         content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; connect-src ws://192.168.1.5:8000 ws://192.168.1.5:8000">
+      <meta name="format-detection" content="telephone=no">
+      <meta name="msapplication-tap-highlight" content="no">
+      <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css" />
+      <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
+      <link rel="stylesheet" type="text/css" href="css/index.css">
+      <title id="title">VideoChatApp</title>
+   </head>
+   <body id="bodyStyle">
+      <div id="loginPage" class="container-text-center" style="position: absolute; top: 50%; left: 50%;transform: translate(-50%,-50%); ">
+         <div class="column">
+            <div class="col-md-4 col-md-offset-8">
+               <h2 style="color: white; text-decoration: underline; font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;text-shadow: yellow; font-size: xx-large;">Sign In</h2>
+               <input type="email" id="usernameInput" c lass="form-control formgroup" placeholder="Login" required=""
+                  autofocus="" style="height:50; width: 200; background-color: #17223b; color: white;">
+               <button id="loginBtn" class="loginBtn">
+                  Login</button>                
+            </div>
+         </div>
+      </div>
+      <div id="callPage" class="call-page">
+         <div class="row">
+            <video id="localVideo" autoplay class="localVideoClass"></video>
+            <video id="remoteVideo" autoplay class="remoteVideoClass"></video>
+         </div>
+         <div class="row text-center">
+            <div class="col-md-12">
+               <input id="callToUsernameInput" type="text" placeholder="username to call" style="align-items: center; height: 40; width:200; top:-200;"/>
+               <button id="callBtn" class="callBtn" style="width: 100;
+               height: 40;background-color: #25d366; align-items: center;">
+                  <p style="color: white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
+                     Call
+                  </p>
+               </button>
+               <button id="hangUpBtn" class="btn-danger btn" style="width: 100;
+               height: 40;background-color: red; align-items: center;">
+                  <p style="color:white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
+                     Hang Up
+                  </p>
+               </button>
+               <button id="StopCamera" class="btn-danger btn" style="width: 100;
+               height: 40;background-color: transparent; align-items: center;">
+                  <p id="CameraControlText" style="color: white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
+                  </p>
+               </button>
+               <button id="StartCamera" class="btn-danger btn" style="width: 100;
+               height: 40;background-color: transparent; align-items: center;">
+                  <p style="color: white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
+                     Start Cam
+                  </p>
+               </button>
+               <button id="BackToLoginPage" class="btn-danger btn" style="width: 100;
+               height: 40;background-color: transparent; align-items: center;">
+                  <p style="color: white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
+                     Back
+                  </p>
+               </button>
+            </div>
+         </div>
+      </div>
+      <script type="text/javascript" src="cordova.js"></script>
+      <script type="text/javascript" src="js/index.js"></script>
+      <!--İNCOMİNG CALL DİALOG DESİGN--------------------------------->
+      <div id="InComingModal" class="in-coming-page">
+         <h1 style="color:snow">
+            <span id="callerName"></span>
+         </h1>
+         <button id="kabulBtn" class="AcceptButton">Accept</button>
+         <button id="redBtn" class="DeclineButton">Decline</button>
+      </div>   
+      <!--İNCOMİNG CALL DİALOG DESİGN--------------------------------->
+   </body>
+</html>

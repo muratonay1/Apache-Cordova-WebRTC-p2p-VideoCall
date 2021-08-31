@@ -5,6 +5,6 @@ services:
     build: .
     image: cordovawebrtc
     environment:
-      - WEB_SOCKET_URL: node.ismetmuratonay.tk
+      - WEB_SOCKET_URL=node.ismetmuratonay.tk
     ports:
       - 4236:8001

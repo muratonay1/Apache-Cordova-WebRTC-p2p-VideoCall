@@ -1,0 +1,8 @@
+version: "3.4"
+services:
+  express:
+    container_name: cordovawebrtc
+    build: .
+    image: cordovawebrtc
+    ports:
+      - 4236:8001

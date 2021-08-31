@@ -3,6 +3,7 @@ WORKDIR /webrtc
 COPY . .
 RUN npm install
 RUN npm install -g cordova
+RUN cordova telemetry on
 RUN cordova requirements browser
 RUN cordova build browser --verbose
 EXPOSE 8001

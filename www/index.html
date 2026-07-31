@@ -9,135 +9,267 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <title>VideoChat Pro</title>
+    <title>WhatsApp WebRTC</title>
 
     <style>
         :root {
-            --primary-neon: #00f2fe;
-            --accent-neon: #4facfe;
-            --pink-neon: #ff0844;
-            --card-bg: rgba(18, 22, 32, 0.95);
-            --card-border: rgba(0, 242, 254, 0.25);
+            --wa-teal: #00a884;
+            --wa-dark-bg: #111b21;
+            --wa-card-bg: #202c33;
+            --wa-outgoing: #005c4b;
+            --wa-incoming: #202c33;
+            --wa-text: #e9edef;
+            --wa-subtext: #8696a0;
+            --wa-blue-tick: #53bdeb;
         }
 
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
         body {
-            background: #0d111a;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            width: 100%;
+            height: 100%;
             margin: 0;
+            padding: 0;
+            background: #0c1317;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--wa-text);
             overflow: hidden;
-            color: #ffffff;
-            min-height: 100vh;
+        }
+
+        /* MOBİL CONTAINER VE SAFE AREA (ÇENTİK & DURUM BARI PAYI) */
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            height: 100dvh;
+            /* Dynamic Viewport Height (Mobil Adres Çubuğu Uyumlu) */
+            margin: 0 auto;
+            background: var(--wa-dark-bg);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            padding-top: env(safe-area-inset-top);
+            /* iOS ve Android çentik payı */
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* GİRİŞ EKRANI */
+        #loginScreen {
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
         }
 
-        .animated-bg {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            z-index: -1;
-        }
-
-        .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.5;
-            animation: float 18s ease-in-out infinite alternate;
-        }
-
-        .orb-1 {
-            width: 380px;
-            height: 380px;
-            background: #00f2fe;
-            top: -10%;
-            left: -10%;
-        }
-
-        .orb-2 {
-            width: 420px;
-            height: 420px;
-            background: #7f00ff;
-            bottom: -10%;
-            right: -10%;
-            animation-delay: -5s;
-        }
-
-        .orb-3 {
-            width: 320px;
-            height: 320px;
-            background: #ff0844;
-            top: 35%;
-            left: 35%;
-            animation-delay: -10s;
-        }
-
-        @keyframes float {
-            0% {
-                transform: translate(0, 0) scale(1);
-            }
-
-            50% {
-                transform: translate(60px, 40px) scale(1.15);
-            }
-
-            100% {
-                transform: translate(-40px, 80px) scale(0.9);
-            }
-        }
-
         .glass-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(25px);
-            border: 1px solid var(--card-border);
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 242, 254, 0.15);
-            width: 100%;
-            max-width: 480px;
-            border-radius: 28px;
-            padding: 2rem;
-        }
-
-        @media (max-width: 576px) {
-            .glass-card {
-                max-width: 100%;
-                height: 100vh;
-                border-radius: 0;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                border: none;
-            }
+            background: var(--wa-card-bg);
+            border-radius: 20px;
+            padding: 2.5rem 2rem;
+            width: 90%;
+            text-align: center;
         }
 
         .glass-input {
-            background: #080c14 !important;
-            border: 1.5px solid rgba(0, 242, 254, 0.4) !important;
-            color: #ffffff !important;
-            border-radius: 16px;
-            padding: 14px 18px;
-            font-weight: 500;
+            background: #111b21 !important;
+            border: 1px solid #2a3942 !important;
+            color: #fff !important;
+            border-radius: 12px;
+            padding: 12px 16px;
         }
 
-        .glass-input::placeholder {
-            color: #94a3b8 !important;
-            opacity: 1 !important;
-        }
-
-        .btn-neon {
-            background: linear-gradient(135deg, var(--primary-neon), var(--accent-neon));
+        .btn-wa {
+            background: var(--wa-teal);
+            color: #111b21;
+            font-weight: bold;
             border: none;
-            color: #020617;
-            font-weight: 700;
-            box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
-            transition: all 0.3s ease;
+            border-radius: 25px;
+            padding: 12px;
+            width: 100%;
         }
 
-        /* GELEN ARAMA EKRANI */
+        /* TEPEDEKİ HEADER VE SEKMELERİN GÖRÜNÜR OLMASINI SAĞLAYAN DÜZENLEME */
+        #dialScreen {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .wa-header {
+            background: var(--wa-card-bg);
+            padding: 14px 16px 0 16px;
+            flex-shrink: 0;
+            /* Header'ın sıkışmasını/kaybolmasını engeller */
+            z-index: 10;
+        }
+
+        .wa-nav-tabs {
+            display: flex;
+            border-bottom: 2px solid #222d34;
+            margin-top: 12px;
+        }
+
+        .wa-tab-item {
+            flex: 1;
+            text-align: center;
+            padding: 10px 0;
+            color: var(--wa-subtext);
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .wa-tab-item.active {
+            color: var(--wa-teal);
+            border-bottom: 3px solid var(--wa-teal);
+        }
+
+        .badge-unread {
+            background: var(--wa-teal);
+            color: #111b21;
+            font-size: 0.72rem;
+            font-weight: bold;
+            border-radius: 50%;
+            padding: 2px 7px;
+            margin-left: 4px;
+        }
+
+        /* LİSTE ALANI (SADECE BURASI KAYDIRILABİLİR) */
+        .tab-content-container {
+            flex: 1;
+            overflow-y: auto;
+            width: 100%;
+        }
+
+        .chat-list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #222d34;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .chat-list-item:active {
+            background: #2a3942;
+        }
+
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #6a7f8a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            color: #fff;
+            margin-right: 14px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .online-indicator {
+            width: 12px;
+            height: 12px;
+            background: #00a884;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            border: 2px solid var(--wa-dark-bg);
+        }
+
+        /* SOHBET PENCERESİ EKRANI */
+        .chat-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0b141a;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: var(--wa-card-bg);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .chat-body {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background-image: radial-gradient(#ffffff0a 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+
+        .msg-bubble {
+            max-width: 75%;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 0.92rem;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .msg-outgoing {
+            align-self: flex-end;
+            background: var(--wa-outgoing);
+            color: #e9edef;
+            border-top-right-radius: 0;
+        }
+
+        .msg-incoming {
+            align-self: flex-start;
+            background: var(--wa-incoming);
+            color: #e9edef;
+            border-top-left-radius: 0;
+        }
+
+        .msg-meta {
+            font-size: 0.68rem;
+            color: var(--wa-subtext);
+            float: right;
+            margin-left: 10px;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .tick-blue {
+            color: var(--wa-blue-tick);
+        }
+
+        .chat-footer {
+            background: var(--wa-card-bg);
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        /* GÖRÜŞME VE KONTROL BARI */
         .call-screen-container {
             width: 100%;
-            height: 100vh;
+            height: 100%;
             background: #121620;
             display: flex;
             flex-direction: column;
@@ -147,26 +279,11 @@
             z-index: 100;
         }
 
-        .avatar-circle {
-            width: 150px;
-            height: 150px;
-            background: #252d3d;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            margin-bottom: 24px;
-        }
-
-        /* GÖRÜŞME EKRANI VE ANLIK EKRAN DEĞİŞTİRME (SWAP) */
         .main-video-container {
             position: relative;
             width: 100%;
-            height: 100vh;
+            height: 100%;
             background: #000;
-            cursor: pointer;
         }
 
         .main-video {
@@ -179,19 +296,13 @@
             position: absolute;
             top: 70px;
             right: 20px;
-            width: 110px;
-            height: 160px;
-            border-radius: 18px;
+            width: 100px;
+            height: 150px;
+            border-radius: 16px;
             overflow: hidden;
-            border: 2px solid rgba(0, 242, 254, 0.6);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--wa-teal);
             z-index: 10;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        .pip-container:hover {
-            transform: scale(1.05);
         }
 
         .pip-video {
@@ -200,29 +311,25 @@
             object-fit: cover;
         }
 
-        /* ALT KONTROL BARI */
         .bottom-control-bar {
             position: absolute;
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(22, 27, 38, 0.92);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(32, 44, 51, 0.95);
             border-radius: 40px;
             padding: 10px 24px;
             display: flex;
             gap: 15px;
             align-items: center;
             z-index: 20;
-            width: 90%;
-            max-width: 380px;
+            width: 85%;
             justify-content: space-around;
         }
 
         .btn-call-action {
-            width: 52px;
-            height: 52px;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
             border: none;
             display: flex;
@@ -230,202 +337,149 @@
             align-items: center;
             color: white;
             background: rgba(255, 255, 255, 0.12);
-            transition: all 0.2s;
-        }
-
-        .btn-call-action:active {
-            transform: scale(0.92);
         }
 
         .btn-call-action.danger {
-            background: var(--pink-neon);
+            background: #ff0844;
         }
 
         .btn-call-action.success {
-            background: #22c55e;
-        }
-
-        /* ÜST STATUS BAR */
-        .top-status-bar {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 30;
-            pointer-events: none;
-        }
-
-        .status-badge {
-            background: rgba(18, 22, 32, 0.85);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--primary-neon);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .history-item {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 14px;
-            padding: 12px 16px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .text-muted{
-            color: rgb(0 119 146) !important;
+            background: #00a884;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="animated-bg">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-    </div>
+    <div class="app-container">
 
-    <!-- EKRAN 1: GİRİŞ -->
-    <div id="loginScreen" class="container d-flex justify-content-center align-items-center px-3 vh-100">
-        <div class="glass-card text-center">
-            <div class="mb-4">
-                <div class="d-inline-flex p-3 rounded-circle mb-3"
-                    style="background: rgba(0, 242, 254, 0.15); border: 1px solid var(--primary-neon);">
-                    <i class="fa-solid fa-bolt fa-2x text-info"></i>
-                </div>
-                <h3 class="fw-bold text-white mb-1">VideoChat Pro</h3>
-                <p class="text-light opacity-75 small">Sesli & Görüntülü İletişim</p>
+        <!-- EKRAN 1: GİRİŞ -->
+        <div id="loginScreen" class="w-100 h-100 d-flex justify-content-center align-items-center">
+            <div class="glass-card">
+                <i class="fa-brands fa-whatsapp text-success fa-4x mb-3"></i>
+                <h4 class="fw-bold mb-1">WhatsApp WebRTC</h4>
+                <p class="text-muted small mb-4">Giriş Yaparak Sohbet Et ve Ara</p>
+                <input type="text" id="usernameInput" class="form-control glass-input mb-3 text-center"
+                    placeholder="Kullanıcı Adınız" autocomplete="off">
+                <button id="loginBtn" class="btn btn-wa">Giriş Yap</button>
             </div>
-            <input type="text" id="usernameInput" class="form-control glass-input mb-4 text-center fs-5"
-                placeholder="Kullanıcı Adınız" autocomplete="off">
-            <button id="loginBtn" class="btn btn-neon btn-lg w-100 rounded-pill"><i
-                    class="fa-solid fa-arrow-right-to-bracket me-2"></i> Giriş Yap</button>
         </div>
-    </div>
 
-    <!-- EKRAN 2: LOBİ -->
-    <div id="dialScreen" class="container d-none justify-content-center align-items-center px-3 vh-100">
-        <div class="glass-card">
-            <div
-                class="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom border-secondary border-opacity-50">
+        <!-- EKRAN 2: LOBİ & TABS (SOHBETLER, ARAMALAR, KİŞİLER) -->
+        <div id="dialScreen" class="w-100 h-100 d-none flex-column">
+            <div class="wa-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold m-0 text-success"><i class="fa-brands fa-whatsapp me-2"></i>WhatsApp</h5>
+                    <div class="d-flex gap-3 align-items-center">
+                        <span class="small fw-bold" id="myUsernameDisplay">Ben</span>
+                        <i id="logoutBtn" class="fa-solid fa-power-off text-danger cursor-pointer fs-5"></i>
+                    </div>
+                </div>
+                <div class="wa-nav-tabs">
+                    <div class="wa-tab-item active" id="tab-chats">Sohbetler</div>
+                    <div class="wa-tab-item" id="tab-calls">Aramalar</div>
+                    <div class="wa-tab-item" id="tab-contacts">Kişiler (<span id="onlineCountBadge">0</span>)</div>
+                </div>
+            </div>
+
+            <!-- TABS İÇERİKLERİ -->
+            <div class="flex-grow-1 overflow-y-auto">
+                <div id="view-chats" class="w-100">
+                    <div id="recentChatsList"></div>
+                </div>
+                <div id="view-calls" class="w-100 d-none">
+                    <div id="historyList"></div>
+                </div>
+                <div id="view-contacts" class="w-100 d-none">
+                    <div id="onlineUsersList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EKRAN 3: DETAYLI CHAT EKRANI -->
+        <div id="chatScreen" class="chat-screen d-none">
+            <div class="chat-header">
                 <div class="d-flex align-items-center gap-2">
-                    <span
-                        style="width:10px; height:10px; background:#22c55e; border-radius:50%; box-shadow:0 0 10px #22c55e;"></span>
-                    <span class="fw-bold fs-5 text-white" id="myUsernameDisplay">Kullanıcı</span>
+                    <i id="backFromChatBtn" class="fa-solid fa-arrow-left fs-5 text-white cursor-pointer me-1"></i>
+                    <div class="user-avatar" style="width:38px; height:38px; font-size:1.1rem;" id="chatHeaderAvatar">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-white small" id="chatHeaderTitle">Kullanıcı</div>
+                        <div style="font-size: 0.72rem;" class="text-success" id="chatHeaderStatus">Çevrimiçi</div>
+                    </div>
                 </div>
-                <button id="logoutBtn" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i
-                        class="fa-solid fa-power-off me-1"></i> Çıkış</button>
-            </div>
-
-            <div class="mb-3">
-                <div class="input-group">
-                    <input id="callToUsernameInput" class="form-control glass-input" type="text"
-                        placeholder="Kullanıcı adı...">
-                    <button id="callVideoBtn" class="btn btn-neon px-3" title="Görüntülü Ara"><i
-                            class="fa-solid fa-video"></i></button>
-                    <button id="callAudioBtn" class="btn btn-outline-info px-3" title="Sesli Ara"><i
-                            class="fa-solid fa-phone"></i></button>
+                <div class="d-flex gap-3 text-white fs-5 align-items-center">
+                    <i id="headerCallVideoBtn" class="fa-solid fa-video cursor-pointer text-success"></i>
+                    <i id="headerCallAudioBtn" class="fa-solid fa-phone cursor-pointer text-success"></i>
                 </div>
             </div>
 
-            <ul class="nav nav-pills nav-fill mb-3" id="pills-tab">
-                <li class="nav-item">
-                    <button class="nav-link active py-2" id="tab-online">
-                        <i class="fa-solid fa-users me-1"></i> Çevrimiçi (<span id="onlineCountBadge">0</span>)
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link py-2" id="tab-history">
-                        <i class="fa-solid fa-clock-rotate-left me-1"></i> Geçmiş
-                    </button>
-                </li>
-            </ul>
+            <div class="chat-body" id="chatMessageArea">
+                <!-- REVERSE FLATLIST MANTIĞI İLE MESAJLAR YÜKLENİR -->
+            </div>
 
-            <div class="tab-content">
-                <div id="view-online" class="tab-pane fade show active">
-                    <div id="onlineUsersList" style="max-height: 220px; overflow-y: auto;"></div>
+            <div class="chat-footer">
+                <input type="text" id="chatInput" class="form-control glass-input" placeholder="Mesaj yazın..."
+                    autocomplete="off">
+                <button id="sendMsgBtn" class="btn btn-wa rounded-circle p-0"
+                    style="width:42px; height:42px; flex-shrink:0;">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- EKRAN 4: GELEN ARAMA MODAL -->
+        <div id="incomingCallModal" class="call-screen-container position-absolute top-0 start-0 d-none">
+            <div class="text-center mt-5">
+                <div class="user-avatar mx-auto mb-3" style="width:120px; height:120px; font-size:3rem;">
+                    <i class="fa-solid fa-user"></i>
                 </div>
-                <div id="view-history" class="tab-pane fade d-none">
-                    <div id="historyList" style="max-height: 220px; overflow-y: auto;"></div>
+                <h3 class="fw-bold text-white mb-2" id="callerNameDisplay">Bilinmeyen</h3>
+                <p class="text-success fs-5" id="callTypeDisplay">Görüntülü Arama...</p>
+            </div>
+
+            <div class="d-flex gap-5 mb-5">
+                <button id="rejectBtn" class="btn-call-action danger" style="width: 65px; height: 65px;">
+                    <i class="fa-solid fa-phone-slash fa-lg"></i>
+                </button>
+                <button id="acceptBtn" class="btn-call-action success" style="width: 65px; height: 65px;">
+                    <i class="fa-solid fa-phone fa-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- EKRAN 5: WEBRTC GÖRÜŞME EKRANI -->
+        <div id="videoScreen" class="w-100 h-100 d-none position-relative">
+            <div class="position-absolute top-0 start-0 m-3 z-3 bg-dark px-3 py-1 rounded-pill small border border-success"
+                id="callTimerBadge">00:00</div>
+
+            <div class="main-video-container" id="mainVideoWrapper">
+                <video id="remoteVideo" autoplay playsinline class="main-video"></video>
+                <div id="remoteCameraOffOverlay"
+                    class="position-absolute top-0 start-0 w-100 h-100 bg-dark d-none flex-column justify-content-center align-items-center z-2">
+                    <div class="user-avatar mb-3" style="width:100px; height:100px; font-size:2.5rem;"><i
+                            class="fa-solid fa-user"></i></div>
+                    <h6 class="text-white" id="remoteCamOffText">Kamera Kapalı</h6>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- EKRAN 3: GELEN ARAMA MODAL -->
-    <div id="incomingCallModal" class="call-screen-container position-absolute top-0 start-0 d-none">
-        <div class="text-center mt-5">
-            <div class="avatar-circle mx-auto">
-                <i class="fa-solid fa-user text-light opacity-50" style="font-size: 70px;"></i>
-            </div>
-            <h2 class="fw-bold text-white mb-2" id="callerNameDisplay">Bilinmeyen</h2>
-            <p class="text-info fs-5" id="callTypeDisplay">Görüntülü Arama...</p>
-        </div>
-
-        <div class="d-flex gap-5 mb-5">
-            <button id="rejectBtn" class="btn-call-action danger" style="width: 70px; height: 70px;">
-                <i class="fa-solid fa-phone-slash fa-xl"></i>
-            </button>
-            <button id="acceptBtn" class="btn-call-action success" style="width: 70px; height: 70px;">
-                <i class="fa-solid fa-phone fa-xl"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- EKRAN 4: GÖRÜŞME EKRANI (DİNAMİK VİDEO FLIP DESTEKLİ) -->
-    <div id="videoScreen" class="w-100 h-100 d-none position-relative">
-        <div class="top-status-bar">
-            <div id="callTimerBadge" class="status-badge">00:00</div>
-            <div id="remoteMicMutedBadge" class="status-badge bg-danger text-white border-0 d-none">
-                <i class="fa-solid fa-microphone-slash me-1"></i> Sessizde
-            </div>
-        </div>
-
-        <!-- ANA BÜYÜK VİDEO (DEĞİŞTİRİLEBİLİR) -->
-        <div class="main-video-container" id="mainVideoWrapper">
-            <video id="remoteVideo" autoplay playsinline class="main-video"></video>
-
-            <div id="remoteCameraOffOverlay"
-                class="position-absolute top-0 start-0 w-100 h-100 bg-dark d-none flex-column justify-content-center align-items-center z-2">
-                <div class="avatar-circle">
-                    <i class="fa-solid fa-user text-light opacity-50" style="font-size: 70px;"></i>
+            <div class="pip-container" id="pipVideoWrapper">
+                <video id="localVideo" autoplay playsinline muted class="pip-video"></video>
+                <div id="localCameraOffOverlay"
+                    class="position-absolute top-0 start-0 w-100 h-100 bg-dark d-none flex-column justify-content-center align-items-center">
+                    <i class="fa-solid fa-user-slash text-light opacity-50"></i>
                 </div>
-                <h5 class="fw-bold text-white" id="remoteCamOffText">Kamera Kapalı</h5>
+            </div>
+
+            <div class="bottom-control-bar">
+                <button id="switchCamBtn" class="btn-call-action"><i class="fa-solid fa-camera-rotate"></i></button>
+                <button id="toggleCamBtn" class="btn-call-action"><i class="fa-solid fa-video-slash"></i></button>
+                <button id="toggleMicBtn" class="btn-call-action"><i class="fa-solid fa-microphone"></i></button>
+                <button id="hangUpBtn" class="btn-call-action danger"><i class="fa-solid fa-phone-slash"></i></button>
             </div>
         </div>
 
-        <!-- KÜÇÜK PIP VİDEO (TIKLANDIĞINDA BÜYÜKLE YER DEĞİŞTİRİR) -->
-        <div class="pip-container" id="pipVideoWrapper" title="Ekranları Yer Değiştir">
-            <video id="localVideo" autoplay playsinline muted class="pip-video"></video>
-            <div id="localCameraOffOverlay"
-                class="position-absolute top-0 start-0 w-100 h-100 bg-dark d-none flex-column justify-content-center align-items-center">
-                <i class="fa-solid fa-user-slash fa-lg text-light opacity-50"></i>
-            </div>
-        </div>
-
-        <!-- ALT KONTROL BARI -->
-        <div class="bottom-control-bar">
-            <button id="switchCamBtn" class="btn-call-action" title="Kamera Çevir">
-                <i class="fa-solid fa-camera-rotate fa-lg"></i>
-            </button>
-            <button id="toggleCamBtn" class="btn-call-action" title="Kamera Aç/Kapat">
-                <i class="fa-solid fa-video-slash fa-lg"></i>
-            </button>
-            <button id="toggleMicBtn" class="btn-call-action" title="Sessiz">
-                <i class="fa-solid fa-microphone fa-lg"></i>
-            </button>
-            <button id="hangUpBtn" class="btn-call-action danger" title="Aramayı Bitir">
-                <i class="fa-solid fa-phone-slash fa-lg"></i>
-            </button>
-        </div>
     </div>
 
     <script type="text/javascript" src="cordova.js"></script>

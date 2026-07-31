@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const WebSocket = require('ws');
-const crypto = require('crypto'); // Unique ID üretimi için built-in kütüphane
+const crypto = require('crypto');
 
 // STATİK WEB SUNUCUSU
 const server = http.createServer((req, res) => {
@@ -29,21 +29,26 @@ const server = http.createServer((req, res) => {
     });
 });
 
-// LOG YARDIMCI FONKSİYONU (Zaman Damgalı ve Kategorili)
 function logServer(type, message, details = "") {
     const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const detailStr = details ? ` | ${JSON.stringify(details)}` : '';
     console.log(`[${timestamp}] [${type.padEnd(18)}] ${message}${detailStr}`);
 }
 
-// WEBSOCKET SUNUCUSU
 const wss = new WebSocket.Server({ server });
 
 const users = new Map();
+const userLastSeen = new Map(); // Son görülme zamanlarını tutar
 const callHistory = [];
+const globalChatMessages = [];
 
 function broadcastUserList() {
-    const userList = Array.from(users.values()).map(u => u.username);
+    const userList = Array.from(users.values()).map(u => ({
+        username: u.username,
+        isOnline: true,
+        activeChatTarget: u.activeChatTarget || null
+    }));
+
     const message = JSON.stringify({ type: "USER_LIST", payload: { users: userList } });
     users.forEach((ws) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(message);
@@ -71,12 +76,11 @@ function findUser(username) {
     return users.get(username.trim().toLowerCase());
 }
 
-// WEBSOCKET BAĞLANTILARI
 wss.on('connection', (ws, req) => {
-    // 1. HER BAĞLANTIYA BENZERSİZ BİR SOCKET ID VE IP ATA
     ws.socketId = crypto.randomBytes(4).toString('hex');
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     ws.isBusy = false;
+    ws.activeChatTarget = null;
 
     logServer("SOCKET_CONNECTED", `Yeni cihaz bağlandı. Socket ID: ${ws.socketId}`, { ip: clientIp });
 
@@ -85,16 +89,16 @@ wss.on('connection', (ws, req) => {
         try { data = JSON.parse(message); } catch (e) { return; }
 
         switch (data.type) {
-            case "LOGIN":
+            case "LOGIN": {
                 const rawUsername = data.payload.username.trim();
                 const lowerUsername = rawUsername.toLowerCase();
 
                 if (users.has(lowerUsername)) {
-                    logServer("LOGIN_FAILED", `Çakışan kullanıcı adı denemesi: "${rawUsername}"`, { socketId: ws.socketId });
+                    logServer("LOGIN_FAILED", `Çakışan kullanıcı adı: "${rawUsername}"`, { socketId: ws.socketId });
                     ws.send(JSON.stringify({
                         type: "LOGIN_RESULT",
                         success: false,
-                        message: `"${rawUsername}" adında bir kullanıcı zaten oturum açmış!`
+                        message: `"${rawUsername}" adında biri zaten oturum açmış!`
                     }));
                     return;
                 }
@@ -104,117 +108,219 @@ wss.on('connection', (ws, req) => {
                 ws.isBusy = false;
 
                 users.set(lowerUsername, ws);
-
-                // 2. KULLANICI GİRİŞ LOGU
-                logServer("USER_LOGIN", `Kullanıcı giriş yaptı: "${rawUsername}"`, { socketId: ws.socketId, totalOnline: users.size });
+                logServer("USER_LOGIN", `Giriş yapıldı: "${rawUsername}"`, { socketId: ws.socketId, totalOnline: users.size });
 
                 ws.send(JSON.stringify({ type: "LOGIN_RESULT", success: true, username: rawUsername }));
                 broadcastUserList();
                 sendCallHistory(ws);
                 break;
+            }
 
-            case "CALL_REQUEST":
+            case "CALL_REQUEST": {
                 const targetName = data.payload.target;
                 const isAudioOnly = data.payload.isAudioOnly || false;
                 const targetWs = findUser(targetName);
 
                 if (!targetWs) {
-                    logServer("CALL_FAILED", `Arama başarısız: "${targetName}" çevrimdışı.`, { caller: ws.username });
                     ws.send(JSON.stringify({ type: "ERROR", message: "Kullanıcı çevrimdışı." }));
                     break;
                 }
-
                 if (targetWs === ws) {
                     ws.send(JSON.stringify({ type: "ERROR", message: "Kendinizi arayamazsınız!" }));
                     break;
                 }
-
                 if (targetWs.isBusy) {
-                    logServer("CALL_BUSY", `Arama engellendi: "${targetWs.username}" meşgul.`, { caller: ws.username });
-                    ws.send(JSON.stringify({
-                        type: "ERROR",
-                        message: `"${targetWs.username}" şu anda başka bir görüşmede (Meşgul).`
-                    }));
+                    ws.send(JSON.stringify({ type: "ERROR", message: `"${targetWs.username}" şu anda meşgul.` }));
                     break;
                 }
 
                 ws.isBusy = true;
                 targetWs.isBusy = true;
-
                 ws.otherName = targetWs.username;
                 targetWs.otherName = ws.username;
                 ws.callStartTime = null;
-
-                // 3. ARAMA BAŞLATMA LOGU
-                const callTypeStr = isAudioOnly ? "SESLİ" : "GÖRÜNTÜLÜ";
-                logServer("CALL_REQUEST", `[${callTypeStr}] "${ws.username}" -> "${targetWs.username}" arıyor...`);
 
                 targetWs.send(JSON.stringify({
                     type: "INCOMING_CALL",
                     payload: { caller: ws.username, isAudioOnly: isAudioOnly }
                 }));
                 break;
+            }
 
-            case "CALL_ACCEPT":
+            case "CALL_ACCEPT": {
                 const callerWs = findUser(data.payload.target);
                 if (callerWs) {
                     const startTime = Date.now();
                     callerWs.callStartTime = startTime;
                     ws.callStartTime = startTime;
-
-                    // 4. ARAMA KABUL LOGU
-                    logServer("CALL_ACCEPTED", `Arama kabul edildi: "${ws.username}" <-> "${callerWs.username}"`);
-
                     callerWs.send(JSON.stringify({ type: "CALL_ACCEPTED", payload: { sender: ws.username } }));
                 }
                 break;
+            }
 
-            case "CALL_REJECT":
-                logServer("CALL_REJECTED", `Arama reddedildi: "${ws.username}" ("${data.payload.target}" aramasını reddetti)`);
+            case "CALL_REJECT": {
                 addCallRecord(data.payload.target, ws.username, "REJECTED", "00:00");
                 const rWs = findUser(data.payload.target);
-
                 ws.isBusy = false;
                 if (rWs) {
                     rWs.isBusy = false;
                     rWs.send(JSON.stringify({ type: "CALL_REJECT" }));
                 }
                 break;
+            }
 
             case "OFFER":
             case "ANSWER":
             case "ICE_CANDIDATE":
-            case "MEDIA_STATE_CHANGE":
+            case "MEDIA_STATE_CHANGE": {
                 const relWs = findUser(data.payload.target);
                 if (relWs) {
                     data.payload.sender = ws.username;
                     relWs.send(JSON.stringify(data));
                 }
                 break;
+            }
 
-            case "LEAVE":
-                logServer("CALL_ENDED_USER", `Arama kullanıcı tarafından sonlandırıldı: "${ws.username}"`);
+            case "LEAVE": {
                 handleUserLeave(ws, "COMPLETED");
                 break;
+            }
+
+            // AKILLI CHAT MESAJLAŞMA & TİK DURUMLARI
+            case "SEND_MESSAGE": {
+                const { target, text } = data.payload;
+                const targetWs = findUser(target);
+
+                // Status hesapla: Alıcı ekrandaysa 'READ', online ise 'DELIVERED', yoksa 'SENT'
+                let initialStatus = 'SENT';
+                if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                    initialStatus = (targetWs.activeChatTarget === ws.username.toLowerCase()) ? 'READ' : 'DELIVERED';
+                }
+
+                const messageData = {
+                    id: Date.now() + Math.random().toString(36).substring(2, 5),
+                    sender: ws.username,
+                    receiver: target,
+                    text: text,
+                    timestamp: Date.now(),
+                    status: initialStatus
+                };
+
+                globalChatMessages.push(messageData);
+                if (globalChatMessages.length > 1000) globalChatMessages.shift();
+
+                // Alıcıya mesajı ilet
+                if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                    targetWs.send(JSON.stringify({ type: "RECEIVE_MESSAGE", payload: messageData }));
+                }
+
+                // Gönderene onay dön
+                ws.send(JSON.stringify({ type: "MESSAGE_SENT_ACK", payload: messageData }));
+                break;
+            }
+
+            case "OPEN_CHAT": {
+                const targetLower = (data.payload.target || "").toLowerCase();
+                ws.activeChatTarget = targetLower;
+
+                // Bu kişiden gelen ve henüz READ olmayan tüm mesajları READ yap
+                let updated = false;
+                globalChatMessages.forEach(msg => {
+                    if (msg.sender.toLowerCase() === targetLower && msg.receiver.toLowerCase() === ws.userKey && msg.status !== 'READ') {
+                        msg.status = 'READ';
+                        updated = true;
+                    }
+                });
+
+                // Gönderen kişiye mesajlarının okunduğunu haber ver
+                const senderWs = findUser(data.payload.target);
+                if (senderWs && senderWs.readyState === WebSocket.OPEN) {
+                    senderWs.send(JSON.stringify({
+                        type: "MESSAGES_READ_NOTIFICATION",
+                        payload: { byUser: ws.username }
+                    }));
+                }
+                break;
+            }
+
+            case "CLOSE_CHAT": {
+                ws.activeChatTarget = null;
+                break;
+            }
+
+            case "GET_CHAT_HISTORY": {
+                const peerName = (data.payload.target || "").toLowerCase();
+                const history = globalChatMessages.filter(m =>
+                    (m.sender.toLowerCase() === ws.userKey && m.receiver.toLowerCase() === peerName) ||
+                    (m.sender.toLowerCase() === peerName && m.receiver.toLowerCase() === ws.userKey)
+                );
+
+                const peerWs = findUser(peerName);
+                const lastSeenTime = userLastSeen.get(peerName) || null;
+
+                ws.send(JSON.stringify({
+                    type: "CHAT_HISTORY_RESPONSE",
+                    payload: {
+                        target: data.payload.target,
+                        history: history,
+                        isOnline: !!peerWs,
+                        lastSeen: lastSeenTime
+                    }
+                }));
+                break;
+            }
+
+            case "GET_ALL_RECENT_CHATS": {
+                // Ana sayfadaki sohbet listesi ve okunmamış sayılarını hesaplar
+                const myKey = ws.userKey;
+                const summaryMap = new Map();
+
+                globalChatMessages.forEach(msg => {
+                    const sKey = msg.sender.toLowerCase();
+                    const rKey = msg.receiver.toLowerCase();
+
+                    if (sKey === myKey || rKey === myKey) {
+                        const otherPerson = sKey === myKey ? msg.receiver : msg.sender;
+                        const otherKey = otherPerson.toLowerCase();
+
+                        if (!summaryMap.has(otherKey)) {
+                            summaryMap.set(otherKey, { username: otherPerson, lastMsg: msg, unreadCount: 0 });
+                        } else {
+                            const existing = summaryMap.get(otherKey);
+                            if (msg.timestamp > existing.lastMsg.timestamp) {
+                                existing.lastMsg = msg;
+                            }
+                        }
+
+                        if (rKey === myKey && msg.status !== 'READ') {
+                            const existing = summaryMap.get(otherKey);
+                            existing.unreadCount++;
+                        }
+                    }
+                });
+
+                ws.send(JSON.stringify({
+                    type: "RECENT_CHATS_RESPONSE",
+                    payload: Array.from(summaryMap.values())
+                }));
+                break;
+            }
         }
     });
 
     ws.on('close', () => {
-        // 5. BAĞLANTI KOPMA VE ÇIKIŞ LOGU
         if (ws.userKey) {
-            logServer("USER_LOGOUT", `Kullanıcı ayrıldı: "${ws.username}"`, { socketId: ws.socketId });
+            userLastSeen.set(ws.userKey, Date.now());
+            logServer("USER_LOGOUT", `Ayrıldı: "${ws.username}"`, { socketId: ws.socketId });
             handleUserLeave(ws, "COMPLETED");
             users.delete(ws.userKey);
             broadcastUserList();
-        } else {
-            logServer("SOCKET_DISCONNECTED", `Bağlantı koptu (Giriş yapılmamıştı). Socket ID: ${ws.socketId}`);
         }
     });
 });
 
 function handleUserLeave(ws, defaultStatus) {
     ws.isBusy = false;
-
     if (ws && ws.otherName) {
         const otherWs = findUser(ws.otherName);
         let durationStr = "00:00";
@@ -230,9 +336,6 @@ function handleUserLeave(ws, defaultStatus) {
             status = "MISSED";
         }
 
-        // 6. GÖRÜŞME BİTİŞ LOGU
-        logServer("CALL_FINISHED", `Görüşme Bitti: "${ws.username}" <-> "${ws.otherName}" | Süre: ${durationStr} | Durum: ${status}`);
-
         addCallRecord(ws.username, ws.otherName, status, durationStr);
 
         if (otherWs) {
@@ -247,8 +350,7 @@ function handleUserLeave(ws, defaultStatus) {
 }
 
 server.listen(8000, () => {
-    console.log("\n=======================================================================");
-    console.log(" SUNUCU BAŞLATILDI (PORT: 8000)");
-    console.log(" Detaylı Loglama, Socket ID Atamaları ve Meşgul Durumları Aktif!");
-    console.log("=======================================================================\n");
+    console.log("\n=======================================================");
+    console.log(" WHATSAPP SOHBET VE WEBRTC SUNUCUSU (PORT: 8000) ");
+    console.log("=======================================================\n");
 });

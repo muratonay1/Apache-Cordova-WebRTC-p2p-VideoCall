@@ -4,6 +4,17 @@ const STATES = {
     IN_CALL: 'IN_CALL'
 };
 
+function formatTimeAgo(timestamp) {
+    if (!timestamp) return "";
+    const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+    if (diffSec < 60) return "az önce";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}dk`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}saat`;
+    return "Dün";
+}
+
 class SoundEffects {
     constructor() { this.ctx = null; this.interval = null; }
     init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -33,6 +44,7 @@ class UIManager {
         this.screens = {
             login: document.getElementById('loginScreen'),
             dial: document.getElementById('dialScreen'),
+            chat: document.getElementById('chatScreen'),
             incoming: document.getElementById('incomingCallModal'),
             video: document.getElementById('videoScreen')
         };
@@ -41,17 +53,21 @@ class UIManager {
         this.callerNameDisplay = document.getElementById('callerNameDisplay');
         this.callTypeDisplay = document.getElementById('callTypeDisplay');
         this.myUsernameDisplay = document.getElementById('myUsernameDisplay');
+
         this.onlineUsersList = document.getElementById('onlineUsersList');
+        this.recentChatsList = document.getElementById('recentChatsList');
         this.historyList = document.getElementById('historyList');
         this.onlineCountBadge = document.getElementById('onlineCountBadge');
         this.callTimerBadge = document.getElementById('callTimerBadge');
 
+        this.chatMessageArea = document.getElementById('chatMessageArea');
+        this.chatHeaderTitle = document.getElementById('chatHeaderTitle');
+        this.chatHeaderStatus = document.getElementById('chatHeaderStatus');
+
         this.localCamOffOverlay = document.getElementById('localCameraOffOverlay');
         this.remoteCamOffOverlay = document.getElementById('remoteCameraOffOverlay');
-        this.remoteMicBadge = document.getElementById('remoteMicMutedBadge');
         this.remoteCamOffText = document.getElementById('remoteCamOffText');
 
-        // Swap (Ekran Değiştirme) Mantığı
         this.isSwapped = false;
         this.pipWrapper = document.getElementById('pipVideoWrapper');
         this.mainWrapper = document.getElementById('mainVideoWrapper');
@@ -72,28 +88,29 @@ class UIManager {
         }
     }
 
-    // EKRANLARI YER DEĞİŞTİRME (PIP TO MAIN SWAP)
+    openChatScreen(targetUsername) {
+        this.chatHeaderTitle.innerText = targetUsername;
+        this.screens.chat.classList.remove('d-none');
+    }
+
+    closeChatScreen() {
+        this.screens.chat.classList.add('d-none');
+    }
+
     swapVideos() {
         this.isSwapped = !this.isSwapped;
-
         if (this.isSwapped) {
-            // Kendi görüntümüz büyükte, karşı taraf küçükte
             this.mainWrapper.appendChild(this.localVideo);
             this.mainWrapper.appendChild(this.localCamOffOverlay);
-
             this.pipWrapper.appendChild(this.remoteVideo);
             this.pipWrapper.appendChild(this.remoteCamOffOverlay);
-
             this.localVideo.className = "main-video";
             this.remoteVideo.className = "pip-video";
         } else {
-            // Varsayılan: Karşı taraf büyükte, kendi görüntümüz küçükte
             this.mainWrapper.appendChild(this.remoteVideo);
             this.mainWrapper.appendChild(this.remoteCamOffOverlay);
-
             this.pipWrapper.appendChild(this.localVideo);
             this.pipWrapper.appendChild(this.localCamOffOverlay);
-
             this.remoteVideo.className = "main-video";
             this.localVideo.className = "pip-video";
         }
@@ -118,45 +135,70 @@ class UIManager {
         }
     }
 
-    renderOnlineUsers(users, currentUsername, onVideoCall, onAudioCall) {
+    renderRecentChats(chats, onOpenChat) {
+        if (!this.recentChatsList) return;
+        this.recentChatsList.innerHTML = '';
+
+        if (!chats || chats.length === 0) {
+            this.recentChatsList.innerHTML = '<div class="text-muted small text-center py-4">Henüz bir sohbet yok.</div>';
+            return;
+        }
+
+        chats.forEach(chat => {
+            const timeAgo = formatTimeAgo(chat.lastMsg.timestamp);
+            const badgeHtml = chat.unreadCount > 0
+                ? `<span class="badge-unread">${chat.unreadCount}</span>`
+                : '';
+
+            const item = document.createElement('div');
+            item.className = 'chat-list-item';
+            item.innerHTML = `
+                <div class="user-avatar">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="fw-bold text-white">${chat.username}</div>
+                        <div style="font-size: 0.7rem;" class="text-muted">${timeAgo}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <div class="text-muted small text-truncate" style="max-width: 200px;">${chat.lastMsg.text}</div>
+                        ${badgeHtml}
+                    </div>
+                </div>
+            `;
+            item.addEventListener('click', () => onOpenChat(chat.username));
+            this.recentChatsList.appendChild(item);
+        });
+    }
+
+    renderOnlineUsers(users, currentUsername, onOpenChat) {
         if (!this.onlineUsersList) return;
         this.onlineUsersList.innerHTML = '';
-        const otherUsers = users.filter(u => u !== currentUsername);
+        const otherUsers = users.filter(u => u.username !== currentUsername);
 
         if (this.onlineCountBadge) this.onlineCountBadge.innerText = otherUsers.length;
 
         if (otherUsers.length === 0) {
-            this.onlineUsersList.innerHTML = '<div class="text-white opacity-70 small text-center py-3 fw-bold">Çevrimiçi kullanıcı yok.</div>';
+            this.onlineUsersList.innerHTML = '<div class="text-muted small text-center py-4">Çevrimiçi başkası yok.</div>';
             return;
         }
 
-        otherUsers.forEach(user => {
+        otherUsers.forEach(u => {
             const item = document.createElement('div');
-            item.className = 'history-item';
+            item.className = 'chat-list-item';
             item.innerHTML = `
-                <span class="small fw-bold text-white"><i class="fa-solid fa-circle-user me-2 text-info"></i>${user}</span>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-neon rounded-circle call-video-btn" data-username="${user}" style="width:34px; height:34px; padding:0;" title="Görüntülü Ara">
-                        <i class="fa-solid fa-video"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-info rounded-circle call-audio-btn" data-username="${user}" style="width:34px; height:34px; padding:0;" title="Sesli Ara">
-                        <i class="fa-solid fa-phone"></i>
-                    </button>
+                <div class="user-avatar">
+                    <i class="fa-solid fa-user"></i>
+                    <div class="online-indicator"></div>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-white">${u.username}</div>
+                    <div class="text-success small">Çevrimiçi</div>
                 </div>
             `;
+            item.addEventListener('click', () => onOpenChat(u.username));
             this.onlineUsersList.appendChild(item);
-        });
-
-        document.querySelectorAll('.call-video-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                onVideoCall(e.currentTarget.getAttribute('data-username'));
-            });
-        });
-
-        document.querySelectorAll('.call-audio-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                onAudioCall(e.currentTarget.getAttribute('data-username'));
-            });
         });
     }
 
@@ -165,7 +207,7 @@ class UIManager {
         this.historyList.innerHTML = '';
 
         if (!history || history.length === 0) {
-            this.historyList.innerHTML = '<div class="text-white opacity-70 small text-center py-3 fw-bold">Geçmiş kayıt bulunamadı.</div>';
+            this.historyList.innerHTML = '<div class="text-muted small text-center py-4">Arama geçmişi yok.</div>';
             return;
         }
 
@@ -174,27 +216,52 @@ class UIManager {
             const otherPerson = isOutgoing ? item.receiver : item.caller;
 
             let directionIcon = isOutgoing
-                ? '<i class="fa-solid fa-arrow-up-right-from-square text-info me-2 fs-6"></i>'
-                : '<i class="fa-solid fa-arrow-down-left-same-line text-success me-2 fs-6"></i>';
-
-            let statusBadge = '<span class="badge bg-success text-white px-2 py-1">TAMAMLANDI</span>';
-            if (item.status === 'REJECTED') statusBadge = '<span class="badge bg-danger text-white px-2 py-1">REDDEDİLDİ</span>';
-            else if (item.status === 'MISSED') statusBadge = '<span class="badge bg-warning text-dark px-2 py-1">CEVAPSIZ</span>';
+                ? '<i class="fa-solid fa-arrow-up-right text-info me-2"></i>'
+                : '<i class="fa-solid fa-arrow-down-left text-success me-2"></i>';
 
             const div = document.createElement('div');
-            div.className = 'history-item';
+            div.className = 'chat-list-item';
             div.innerHTML = `
-                <div class="d-flex align-items-center">
-                    ${directionIcon}
-                    <div>
-                        <div class="fw-bold text-white fs-6">${otherPerson}</div>
-                        <div class="text-muted small">${item.timestamp} • ${item.duration}</div>
-                    </div>
+                <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-white d-flex align-items-center">${directionIcon} ${otherPerson}</div>
+                    <div class="text-muted small">${item.timestamp} • ${item.duration}</div>
                 </div>
-                <div>${statusBadge}</div>
             `;
             this.historyList.appendChild(div);
         });
+    }
+
+    // SOHBET MESAJLARINI TİK DURUMUYLA BİRLİKTE EKRANA BASAR
+    renderChatHistory(history, currentUsername) {
+        this.chatMessageArea.innerHTML = '';
+        history.forEach(msg => this.appendMessage(msg, currentUsername));
+        this.scrollToBottom();
+    }
+
+    appendMessage(msg, currentUsername) {
+        const isOutgoing = msg.sender === currentUsername;
+        const timeStr = new Date(msg.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+        let tickHtml = '';
+        if (isOutgoing) {
+            if (msg.status === 'SENT') tickHtml = '<i class="fa-solid fa-check ms-1"></i>';
+            else if (msg.status === 'DELIVERED') tickHtml = '<i class="fa-solid fa-check-double ms-1"></i>';
+            else if (msg.status === 'READ') tickHtml = '<i class="fa-solid fa-check-double ms-1 tick-blue"></i>';
+        }
+
+        const div = document.createElement('div');
+        div.className = `msg-bubble ${isOutgoing ? 'msg-outgoing' : 'msg-incoming'}`;
+        div.innerHTML = `
+            <div>${msg.text}</div>
+            <div class="msg-meta">${timeStr} ${tickHtml}</div>
+        `;
+        this.chatMessageArea.appendChild(div);
+        this.scrollToBottom();
+    }
+
+    scrollToBottom() {
+        this.chatMessageArea.scrollTop = this.chatMessageArea.scrollHeight;
     }
 
     showIncomingCall(callerName, isAudioOnly = false) {
@@ -222,11 +289,6 @@ class UIManager {
             this.remoteCamOffOverlay.classList.add('d-flex');
         }
     }
-
-    setRemoteMicState(enabled) {
-        if (enabled) this.remoteMicBadge.classList.add('d-none');
-        else this.remoteMicBadge.classList.remove('d-none');
-    }
 }
 
 class WebRTCManager {
@@ -242,11 +304,9 @@ class WebRTCManager {
         };
     }
 
-    // MEDYA AKIŞINI BAŞLATMA / GÜNCELLEME
     async startLocalStream(enableVideo = true, facingMode = "user") {
         this.currentFacingMode = facingMode;
         try {
-            // Eğer sesli aramaydıysa veya ilk açılışsa genel stream al
             if (!this.localStream) {
                 const constraints = {
                     audio: true,
@@ -259,60 +319,39 @@ class WebRTCManager {
             this.ui.setLocalCameraState(enableVideo);
 
             if (this.peerConnection) {
-                // Ses ve video track'lerini PeerConnection'a eşle
                 this.localStream.getTracks().forEach(track => {
                     const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === track.kind);
-                    if (sender) {
-                        sender.replaceTrack(track);
-                    } else {
-                        this.peerConnection.addTrack(track, this.localStream);
-                    }
+                    if (sender) sender.replaceTrack(track);
+                    else this.peerConnection.addTrack(track, this.localStream);
                 });
             }
         } catch (error) {
-            console.error("Medya erişim hatası:", error);
             alert("Mikrofon/Kamera izni gereklidir!");
         }
     }
 
-    // KESİN ÇÖZÜM: SESİ HİÇ BOZMADAN SADECE KAMERAYI ÇEVİRME
     async switchCamera() {
         if (!this.localStream) return;
-
         const currentVideoTrack = this.localStream.getVideoTracks()[0];
-        if (!currentVideoTrack) return; // Kamera kapalıysa çevirme yapma
+        if (!currentVideoTrack) return;
 
         try {
-            // Yönü tersine çevir
             this.currentFacingMode = this.currentFacingMode === "user" ? "environment" : "user";
-
-            // SADECE yeni video akışı iste (Ses akışına ve mikrofon iznine HİÇ DOKUNMA)
             const newVideoStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: this.currentFacingMode }
             });
-
             const newVideoTrack = newVideoStream.getVideoTracks()[0];
 
-            // 1. Eski video track'ini durdur ve localStream'den çıkar
             currentVideoTrack.stop();
             this.localStream.removeTrack(currentVideoTrack);
-
-            // 2. Yeni video track'ini localStream'e ekle
             this.localStream.addTrack(newVideoTrack);
             this.ui.localVideo.srcObject = this.localStream;
 
-            // 3. WebRTC PeerConnection üzerindeki video göndericisini (sender) dikişsiz değiştir
             if (this.peerConnection) {
                 const videoSender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-                if (videoSender) {
-                    await videoSender.replaceTrack(newVideoTrack);
-                }
+                if (videoSender) await videoSender.replaceTrack(newVideoTrack);
             }
-
-            console.log("Kamera pürüzsüzce çevrildi, ses akışı korundu!");
-        } catch (err) {
-            console.error("Kamera çevirme hatası:", err);
-        }
+        } catch (err) { console.error(err); }
     }
 
     stopLocalStream() {
@@ -399,44 +438,30 @@ class WebRTCManager {
         return false;
     }
 
-    // DINAMIK KAMERA AC/KAPAT (SESLİ ARAMADAYKEN BASTIĞINDA KAMERAYI DA DAHIL EDER VE RE-NEGOTIATE EDER)
     async toggleVideo() {
         if (!this.localStream) return false;
-
         let videoTrack = this.localStream.getVideoTracks()[0];
 
-        // EĞER İLK BAŞTA SESLİ ARAMA YAPILDISA VE VİDEO TRACK HİÇ YOKSA:
         if (!videoTrack) {
             try {
-                // 1. Kamera yayınını al
                 const videoStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: this.currentFacingMode }
                 });
                 videoTrack = videoStream.getVideoTracks()[0];
                 this.localStream.addTrack(videoTrack);
-
-                // 2. Kendi ekranında kamerayı göster
                 this.ui.localVideo.srcObject = this.localStream;
                 this.ui.setLocalCameraState(true);
 
-                // 3. WebRTC PeerConnection'a yeni kanalı ekle
                 if (this.peerConnection) {
                     this.peerConnection.addTrack(videoTrack, this.localStream);
-
-                    // KARŞI TARAFA YENİ OFFER GÖNDER (RE-NEGOTIATION)
                     const offer = await this.peerConnection.createOffer();
                     await this.peerConnection.setLocalDescription(offer);
                     this.sig.send("OFFER", { target: this.sig.connectedUser, offer: offer });
                 }
                 return true;
-            } catch (err) {
-                console.error("Kamera açma hatası:", err);
-                alert("Kamera izni veya desteği alınamadı!");
-                return false;
-            }
+            } catch (err) { return false; }
         }
 
-        // EĞER VİDEO TRACK ZATEN VARSA (AÇ/KAPAT YAPILIYORSA):
         videoTrack.enabled = !videoTrack.enabled;
         this.ui.setLocalCameraState(videoTrack.enabled);
         return videoTrack.enabled;
@@ -454,6 +479,7 @@ class WebRTCManager {
 const App = {
     username: null,
     connectedUser: null,
+    activeChatTarget: null,
     ws: null,
     ui: new UIManager(),
     rtc: null,
@@ -492,14 +518,16 @@ const App = {
                         this.username = data.username;
                         this.ui.myUsernameDisplay.innerText = this.username;
                         this.ui.switchState(STATES.IDLE);
+                        this.refreshRecentChats();
                     } else { alert(data.message); }
                     break;
 
                 case "USER_LIST":
-                    this.ui.renderOnlineUsers(data.payload.users, this.username,
-                        (targetUser) => this.startCallProcess(targetUser, false),
-                        (targetUser) => this.startCallProcess(targetUser, true)
-                    );
+                    this.ui.renderOnlineUsers(data.payload.users, this.username, (target) => this.openChat(target));
+                    break;
+
+                case "RECENT_CHATS_RESPONSE":
+                    this.ui.renderRecentChats(data.payload, (target) => this.openChat(target));
                     break;
 
                 case "CALL_HISTORY":
@@ -513,7 +541,6 @@ const App = {
                     this.ui.showIncomingCall(this.connectedUser, this.isAudioOnlyCall);
                     break;
 
-                // ARAMA KABUL EDİLDİĞİNDE KAMERA VE WEBRTC İLK DEFA BURADA BAŞLAR
                 case "CALL_ACCEPTED":
                     this.sounds.stop();
                     await this.rtc.startLocalStream(!this.isAudioOnlyCall);
@@ -541,8 +568,6 @@ const App = {
                 case "MEDIA_STATE_CHANGE":
                     if (data.payload.mediaType === 'video') {
                         this.ui.setRemoteCameraState(data.payload.enabled, data.payload.sender);
-                    } else if (data.payload.mediaType === 'audio') {
-                        this.ui.setRemoteMicState(data.payload.enabled);
                     }
                     break;
 
@@ -552,12 +577,39 @@ const App = {
                     this.endCall();
                     break;
 
-                // SUNUCUDAN MEŞGUL VEYA HATA MESAJI GELİRSE
                 case "ERROR":
                     this.sounds.stop();
-                    alert(data.message); // "Kullanıcı meşgul" uyarısı gösterilir
+                    alert(data.message);
                     this.connectedUser = null;
-                    // Kameraya hiç dokunulmaz, bulunulan ekranda kalınır!
+                    break;
+
+                // MESAJLAŞMA VE TİK GÜNCELLEMELERİ
+                case "RECEIVE_MESSAGE":
+                    if (this.activeChatTarget && this.activeChatTarget.toLowerCase() === data.payload.sender.toLowerCase()) {
+                        this.ui.appendMessage(data.payload, this.username);
+                        this.send("OPEN_CHAT", { target: this.activeChatTarget });
+                    }
+                    this.refreshRecentChats();
+                    break;
+
+                case "MESSAGE_SENT_ACK":
+                    if (this.activeChatTarget && this.activeChatTarget.toLowerCase() === data.payload.receiver.toLowerCase()) {
+                        this.ui.appendMessage(data.payload, this.username);
+                    }
+                    this.refreshRecentChats();
+                    break;
+
+                case "CHAT_HISTORY_RESPONSE":
+                    this.ui.renderChatHistory(data.payload.history, this.username);
+                    this.ui.chatHeaderStatus.innerText = data.payload.isOnline
+                        ? "Çevrimiçi"
+                        : (data.payload.lastSeen ? `Son görülme: ${formatTimeAgo(data.payload.lastSeen)}` : "Çevrimdışı");
+                    break;
+
+                case "MESSAGES_READ_NOTIFICATION":
+                    if (this.activeChatTarget) {
+                        this.send("GET_CHAT_HISTORY", { target: this.activeChatTarget });
+                    }
                     break;
             }
         };
@@ -569,16 +621,38 @@ const App = {
         }
     },
 
-    // ARAMA SÜRECİNİ BAŞLATMA (ARTIK KAMERAYI HEMEN AÇMIYOR!)
+    refreshRecentChats: function () {
+        this.send("GET_ALL_RECENT_CHATS");
+    },
+
+    openChat: function (targetUser) {
+        this.activeChatTarget = targetUser;
+        this.ui.openChatScreen(targetUser);
+        this.send("OPEN_CHAT", { target: targetUser });
+        this.send("GET_CHAT_HISTORY", { target: targetUser });
+    },
+
+    closeChat: function () {
+        this.send("CLOSE_CHAT");
+        this.activeChatTarget = null;
+        this.ui.closeChatScreen();
+        this.refreshRecentChats();
+    },
+
+    sendMessage: function () {
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if (text.length > 0 && this.activeChatTarget) {
+            this.send("SEND_MESSAGE", { target: this.activeChatTarget, text: text });
+            input.value = '';
+        }
+    },
+
     startCallProcess(targetUser, isAudioOnly = false) {
         if (!targetUser) return;
         this.connectedUser = targetUser;
         this.isAudioOnlyCall = isAudioOnly;
-
-        // Bip sesini çal ama ekranı değiştirmeyip kamerayı AÇMA!
         this.sounds.playDialTone();
-
-        // Doğrudan sunucuya istek at, izin bekle
         this.send("CALL_REQUEST", { target: targetUser, isAudioOnly: isAudioOnly });
     },
 
@@ -588,18 +662,36 @@ const App = {
             if (user.length > 0) this.send("LOGIN", { username: user });
         });
 
-        // GÖRÜNTÜLÜ ARA
-        document.getElementById('callVideoBtn').addEventListener('click', () => {
-            const target = document.getElementById('callToUsernameInput').value.trim();
-            this.startCallProcess(target, false);
+        // CHAT ARAYÜZ ETKİLEŞİMLERİ
+        document.getElementById('sendMsgBtn').addEventListener('click', () => this.sendMessage());
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.sendMessage();
         });
 
-        // SESLİ ARA
-        document.getElementById('callAudioBtn').addEventListener('click', () => {
-            const target = document.getElementById('callToUsernameInput').value.trim();
-            this.startCallProcess(target, true);
+        document.getElementById('backFromChatBtn').addEventListener('click', () => this.closeChat());
+
+        // CHAT ÜSTÜNDEKİ ARAMA BUTONLARI
+        document.getElementById('headerCallVideoBtn').addEventListener('click', () => {
+            this.startCallProcess(this.activeChatTarget, false);
         });
 
+        document.getElementById('headerCallAudioBtn').addEventListener('click', () => {
+            this.startCallProcess(this.activeChatTarget, true);
+        });
+
+        // TABS GEÇİŞLERİ
+        document.getElementById('tab-chats').addEventListener('click', (e) => {
+            this.setActiveTab('tab-chats', 'view-chats');
+            this.refreshRecentChats();
+        });
+        document.getElementById('tab-calls').addEventListener('click', (e) => {
+            this.setActiveTab('tab-calls', 'view-calls');
+        });
+        document.getElementById('tab-contacts').addEventListener('click', (e) => {
+            this.setActiveTab('tab-contacts', 'view-contacts');
+        });
+
+        // WEBRTC VE DİĞER BUTONLAR
         document.getElementById('acceptBtn').addEventListener('click', async () => {
             this.sounds.stop();
             this.ui.hideIncomingCall();
@@ -621,60 +713,33 @@ const App = {
             this.endCall();
         });
 
-        // EKRANLARI YER DEĞİŞTİRME TIKLAMA OLAYLARI (PIP & MAIN CLICK)
-        document.getElementById('pipVideoWrapper').addEventListener('click', () => {
-            this.ui.swapVideos();
-        });
-
-        document.getElementById('switchCamBtn').addEventListener('click', async () => {
-            await this.rtc.switchCamera();
-        });
+        document.getElementById('pipVideoWrapper').addEventListener('click', () => this.ui.swapVideos());
+        document.getElementById('switchCamBtn').addEventListener('click', () => this.rtc.switchCamera());
 
         document.getElementById('toggleMicBtn').addEventListener('click', (e) => {
             const isEnabled = this.rtc.toggleAudio();
-            const btn = e.currentTarget;
-            btn.querySelector('i').className = isEnabled ? 'fa-solid fa-microphone fa-lg' : 'fa-solid fa-microphone-slash fa-lg';
-            btn.style.background = isEnabled ? 'rgba(255, 255, 255, 0.12)' : 'var(--pink-neon)';
+            e.currentTarget.querySelector('i').className = isEnabled ? 'fa-solid fa-microphone' : 'fa-solid fa-microphone-slash';
             this.send("MEDIA_STATE_CHANGE", { target: this.connectedUser, mediaType: 'audio', enabled: isEnabled });
         });
 
-        // DINAMIK KAMERA BUTONU (SESLİ ARAMADAYKEN BASTIGINDA KAMERANI ACIP GONDERIR)
-        // DINAMIK KAMERA BUTONU DİNLEYİCİSİ
         document.getElementById('toggleCamBtn').addEventListener('click', async (e) => {
             const isEnabled = await this.rtc.toggleVideo();
-            const btn = e.currentTarget;
-            btn.querySelector('i').className = isEnabled ? 'fa-solid fa-video fa-lg' : 'fa-solid fa-video-slash fa-lg';
-            btn.style.background = isEnabled ? 'rgba(255, 255, 255, 0.12)' : 'var(--pink-neon)';
-
-            // Karşı tarafa kameranın açıldığını/kapandığını duyur
-            this.send("MEDIA_STATE_CHANGE", {
-                target: this.connectedUser,
-                mediaType: 'video',
-                enabled: isEnabled
-            });
+            e.currentTarget.querySelector('i').className = isEnabled ? 'fa-solid fa-video' : 'fa-solid fa-video-slash';
+            this.send("MEDIA_STATE_CHANGE", { target: this.connectedUser, mediaType: 'video', enabled: isEnabled });
         });
 
-        document.getElementById('tab-online').addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById('tab-online').classList.add('active');
-            document.getElementById('tab-history').classList.remove('active');
-            document.getElementById('view-online').classList.remove('d-none');
-            document.getElementById('view-online').classList.add('show', 'active');
-            document.getElementById('view-history').classList.add('d-none');
-        });
+        document.getElementById('logoutBtn').addEventListener('click', () => location.reload());
+    },
 
-        document.getElementById('tab-history').addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById('tab-history').classList.add('active');
-            document.getElementById('tab-online').classList.remove('active');
-            document.getElementById('view-history').classList.remove('d-none');
-            document.getElementById('view-history').classList.add('show', 'active');
-            document.getElementById('view-online').classList.add('d-none');
-        });
+    setActiveTab: function (tabId, viewId) {
+        document.querySelectorAll('.wa-tab-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
 
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            location.reload();
-        });
+        document.getElementById('view-chats').classList.add('d-none');
+        document.getElementById('view-calls').classList.add('d-none');
+        document.getElementById('view-contacts').classList.add('d-none');
+
+        document.getElementById(viewId).classList.remove('d-none');
     },
 
     endCall: function () {

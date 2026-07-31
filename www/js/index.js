@@ -110,7 +110,7 @@ class UIManager {
             this.mainWrapper.appendChild(this.remoteVideo);
             this.mainWrapper.appendChild(this.remoteCamOffOverlay);
             this.pipWrapper.appendChild(this.localVideo);
-            this.pipWrapper.appendChild(this.localCamOffOverlay);
+            this.pipWrapper.appendChild(this.localCameraOffOverlay);
             this.remoteVideo.className = "main-video";
             this.localVideo.className = "pip-video";
         }
@@ -202,7 +202,8 @@ class UIManager {
         });
     }
 
-    renderHistory(history, currentUsername) {
+    // RENKLİ VE YÖNLÜ WHATSAPP ARAMALAR EKRANI
+    renderHistory(history, currentUsername, onCallUser) {
         if (!this.historyList) return;
         this.historyList.innerHTML = '';
 
@@ -215,24 +216,49 @@ class UIManager {
             const isOutgoing = item.caller === currentUsername;
             const otherPerson = isOutgoing ? item.receiver : item.caller;
 
-            let directionIcon = isOutgoing
-                ? '<i class="fa-solid fa-arrow-up-right text-info me-2"></i>'
-                : '<i class="fa-solid fa-arrow-down-left text-success me-2"></i>';
+            // Yön ve Durum İkonları
+            let arrowIcon = '';
+            let titleColorClass = 'text-white';
+
+            if (item.status === 'REJECTED' || item.status === 'MISSED') {
+                // Cevapsız / Reddedilen (Kırmızı Ok)
+                arrowIcon = '<i class="fa-solid fa-arrow-down-left text-danger me-1"></i>';
+                titleColorClass = 'text-danger';
+            } else if (isOutgoing) {
+                // Giden Arama (Mavi Ok)
+                arrowIcon = '<i class="fa-solid fa-arrow-up-right text-info me-1"></i>';
+            } else {
+                // Gelen Arama (Yeşil Ok)
+                arrowIcon = '<i class="fa-solid fa-arrow-down-left text-success me-1"></i>';
+            }
+
+            // Arama İkonu (Görüntülü veya Sesli)
+            const callActionIcon = item.isAudioOnly
+                ? '<i class="fa-solid fa-phone text-success fs-5"></i>'
+                : '<i class="fa-solid fa-video text-success fs-5"></i>';
 
             const div = document.createElement('div');
             div.className = 'chat-list-item';
             div.innerHTML = `
                 <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="flex-grow-1">
-                    <div class="fw-bold text-white d-flex align-items-center">${directionIcon} ${otherPerson}</div>
-                    <div class="text-muted small">${item.timestamp} • ${item.duration}</div>
+                    <div class="fw-bold ${titleColorClass}">${otherPerson}</div>
+                    <div class="text-muted small d-flex align-items-center mt-1">
+                        ${arrowIcon} ${item.timestamp} ${item.duration !== "00:00" ? '• ' + item.duration : ''}
+                    </div>
                 </div>
+                <div class="call-action-btn cursor-pointer p-2">${callActionIcon}</div>
             `;
+
+            div.querySelector('.call-action-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                onCallUser(otherPerson, item.isAudioOnly);
+            });
+
             this.historyList.appendChild(div);
         });
     }
 
-    // SOHBET MESAJLARINI TİK DURUMUYLA BİRLİKTE EKRANA BASAR
     renderChatHistory(history, currentUsername) {
         this.chatMessageArea.innerHTML = '';
         history.forEach(msg => this.appendMessage(msg, currentUsername));
@@ -531,7 +557,9 @@ const App = {
                     break;
 
                 case "CALL_HISTORY":
-                    this.ui.renderHistory(data.payload.history, this.username);
+                    this.ui.renderHistory(data.payload.history, this.username, (target, isAudioOnly) => {
+                        this.startCallProcess(target, isAudioOnly);
+                    });
                     break;
 
                 case "INCOMING_CALL":
@@ -583,7 +611,6 @@ const App = {
                     this.connectedUser = null;
                     break;
 
-                // MESAJLAŞMA VE TİK GÜNCELLEMELERİ
                 case "RECEIVE_MESSAGE":
                     if (this.activeChatTarget && this.activeChatTarget.toLowerCase() === data.payload.sender.toLowerCase()) {
                         this.ui.appendMessage(data.payload, this.username);
@@ -606,10 +633,12 @@ const App = {
                         : (data.payload.lastSeen ? `Son görülme: ${formatTimeAgo(data.payload.lastSeen)}` : "Çevrimdışı");
                     break;
 
+                case "MESSAGES_DELIVERED_NOTIFICATION":
                 case "MESSAGES_READ_NOTIFICATION":
                     if (this.activeChatTarget) {
                         this.send("GET_CHAT_HISTORY", { target: this.activeChatTarget });
                     }
+                    this.refreshRecentChats();
                     break;
             }
         };
@@ -662,7 +691,6 @@ const App = {
             if (user.length > 0) this.send("LOGIN", { username: user });
         });
 
-        // CHAT ARAYÜZ ETKİLEŞİMLERİ
         document.getElementById('sendMsgBtn').addEventListener('click', () => this.sendMessage());
         document.getElementById('chatInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.sendMessage();
@@ -670,7 +698,6 @@ const App = {
 
         document.getElementById('backFromChatBtn').addEventListener('click', () => this.closeChat());
 
-        // CHAT ÜSTÜNDEKİ ARAMA BUTONLARI
         document.getElementById('headerCallVideoBtn').addEventListener('click', () => {
             this.startCallProcess(this.activeChatTarget, false);
         });
@@ -679,19 +706,17 @@ const App = {
             this.startCallProcess(this.activeChatTarget, true);
         });
 
-        // TABS GEÇİŞLERİ
-        document.getElementById('tab-chats').addEventListener('click', (e) => {
+        document.getElementById('tab-chats').addEventListener('click', () => {
             this.setActiveTab('tab-chats', 'view-chats');
             this.refreshRecentChats();
         });
-        document.getElementById('tab-calls').addEventListener('click', (e) => {
+        document.getElementById('tab-calls').addEventListener('click', () => {
             this.setActiveTab('tab-calls', 'view-calls');
         });
-        document.getElementById('tab-contacts').addEventListener('click', (e) => {
+        document.getElementById('tab-contacts').addEventListener('click', () => {
             this.setActiveTab('tab-contacts', 'view-contacts');
         });
 
-        // WEBRTC VE DİĞER BUTONLAR
         document.getElementById('acceptBtn').addEventListener('click', async () => {
             this.sounds.stop();
             this.ui.hideIncomingCall();

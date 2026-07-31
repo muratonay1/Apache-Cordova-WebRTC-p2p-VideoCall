@@ -46,12 +46,15 @@ class UIManager {
             dial: document.getElementById('dialScreen'),
             chat: document.getElementById('chatScreen'),
             incoming: document.getElementById('incomingCallModal'),
+            outgoing: document.getElementById('outgoingCallModal'),
             video: document.getElementById('videoScreen')
         };
         this.localVideo = document.getElementById('localVideo');
         this.remoteVideo = document.getElementById('remoteVideo');
         this.callerNameDisplay = document.getElementById('callerNameDisplay');
         this.callTypeDisplay = document.getElementById('callTypeDisplay');
+        this.outgoingTargetNameDisplay = document.getElementById('outgoingTargetNameDisplay');
+        this.outgoingCallTypeDisplay = document.getElementById('outgoingCallTypeDisplay');
         this.myUsernameDisplay = document.getElementById('myUsernameDisplay');
 
         this.onlineUsersList = document.getElementById('onlineUsersList');
@@ -110,7 +113,7 @@ class UIManager {
             this.mainWrapper.appendChild(this.remoteVideo);
             this.mainWrapper.appendChild(this.remoteCamOffOverlay);
             this.pipWrapper.appendChild(this.localVideo);
-            this.pipWrapper.appendChild(this.localCameraOffOverlay);
+            this.pipWrapper.appendChild(this.localCamOffOverlay);
             this.remoteVideo.className = "main-video";
             this.localVideo.className = "pip-video";
         }
@@ -175,7 +178,11 @@ class UIManager {
     renderOnlineUsers(users, currentUsername, onOpenChat) {
         if (!this.onlineUsersList) return;
         this.onlineUsersList.innerHTML = '';
-        const otherUsers = users.filter(u => u.username !== currentUsername);
+
+        const otherUsers = users.filter(u => {
+            const name = typeof u === 'string' ? u : u.username;
+            return name !== currentUsername;
+        });
 
         if (this.onlineCountBadge) this.onlineCountBadge.innerText = otherUsers.length;
 
@@ -185,6 +192,7 @@ class UIManager {
         }
 
         otherUsers.forEach(u => {
+            const userName = typeof u === 'string' ? u : u.username;
             const item = document.createElement('div');
             item.className = 'chat-list-item';
             item.innerHTML = `
@@ -193,16 +201,15 @@ class UIManager {
                     <div class="online-indicator"></div>
                 </div>
                 <div class="flex-grow-1">
-                    <div class="fw-bold text-white">${u.username}</div>
+                    <div class="fw-bold text-white">${userName}</div>
                     <div class="text-success small">Çevrimiçi</div>
                 </div>
             `;
-            item.addEventListener('click', () => onOpenChat(u.username));
+            item.addEventListener('click', () => onOpenChat(userName));
             this.onlineUsersList.appendChild(item);
         });
     }
 
-    // RENKLİ VE YÖNLÜ WHATSAPP ARAMALAR EKRANI
     renderHistory(history, currentUsername, onCallUser) {
         if (!this.historyList) return;
         this.historyList.innerHTML = '';
@@ -216,23 +223,18 @@ class UIManager {
             const isOutgoing = item.caller === currentUsername;
             const otherPerson = isOutgoing ? item.receiver : item.caller;
 
-            // Yön ve Durum İkonları
             let arrowIcon = '';
             let titleColorClass = 'text-white';
 
             if (item.status === 'REJECTED' || item.status === 'MISSED') {
-                // Cevapsız / Reddedilen (Kırmızı Ok)
                 arrowIcon = '<i class="fa-solid fa-arrow-down-left text-danger me-1"></i>';
                 titleColorClass = 'text-danger';
             } else if (isOutgoing) {
-                // Giden Arama (Mavi Ok)
                 arrowIcon = '<i class="fa-solid fa-arrow-up-right text-info me-1"></i>';
             } else {
-                // Gelen Arama (Yeşil Ok)
                 arrowIcon = '<i class="fa-solid fa-arrow-down-left text-success me-1"></i>';
             }
 
-            // Arama İkonu (Görüntülü veya Sesli)
             const callActionIcon = item.isAudioOnly
                 ? '<i class="fa-solid fa-phone text-success fs-5"></i>'
                 : '<i class="fa-solid fa-video text-success fs-5"></i>';
@@ -300,6 +302,19 @@ class UIManager {
     hideIncomingCall() {
         this.screens.incoming.classList.add('d-none');
         this.screens.incoming.classList.remove('d-flex');
+    }
+
+    // ARAYAN KİŞİ İÇİN "ARANIYOR..." EKRANI
+    showOutgoingCall(targetName, isAudioOnly = false) {
+        this.outgoingTargetNameDisplay.innerText = targetName;
+        this.outgoingCallTypeDisplay.innerText = isAudioOnly ? "Sesli Aranıyor..." : "Görüntülü Aranıyor...";
+        this.screens.outgoing.classList.remove('d-none');
+        this.screens.outgoing.classList.add('d-flex');
+    }
+
+    hideOutgoingCall() {
+        this.screens.outgoing.classList.add('d-none');
+        this.screens.outgoing.classList.remove('d-flex');
     }
 
     setLocalCameraState(enabled) {
@@ -511,6 +526,7 @@ const App = {
     rtc: null,
     sounds: new SoundEffects(),
     isAudioOnlyCall: false,
+    callTimeoutTimer: null, // 30 Saniyelik Zaman Aşımı Sayacı
 
     init: function () {
         const isCordova = !!window.cordova;
@@ -548,9 +564,25 @@ const App = {
                     } else { alert(data.message); }
                     break;
 
-                case "USER_LIST":
-                    this.ui.renderOnlineUsers(data.payload.users, this.username, (target) => this.openChat(target));
+                case "USER_LIST": {
+                    const onlineUsers = data.payload.users;
+                    this.ui.renderOnlineUsers(onlineUsers, this.username, (target) => this.openChat(target));
+
+                    if (this.activeChatTarget) {
+                        const isTargetOnline = onlineUsers.some(u => {
+                            const uName = typeof u === 'string' ? u : u.username;
+                            return uName.toLowerCase() === this.activeChatTarget.toLowerCase();
+                        });
+
+                        if (isTargetOnline) {
+                            this.ui.chatHeaderStatus.innerText = "Çevrimiçi";
+                            this.ui.chatHeaderStatus.className = "text-success small";
+                        } else {
+                            this.send("GET_CHAT_HISTORY", { target: this.activeChatTarget });
+                        }
+                    }
                     break;
+                }
 
                 case "RECENT_CHATS_RESPONSE":
                     this.ui.renderRecentChats(data.payload, (target) => this.openChat(target));
@@ -570,7 +602,9 @@ const App = {
                     break;
 
                 case "CALL_ACCEPTED":
+                    this.clearCallTimeout();
                     this.sounds.stop();
+                    this.ui.hideOutgoingCall();
                     await this.rtc.startLocalStream(!this.isAudioOnlyCall);
                     this.ui.switchState(STATES.IN_CALL);
                     this.ui.startCallTimer();
@@ -578,6 +612,7 @@ const App = {
                     break;
 
                 case "OFFER":
+                    this.clearCallTimeout();
                     this.sounds.stop();
                     this.ui.startCallTimer();
                     this.connectedUser = data.payload.sender;
@@ -601,16 +636,22 @@ const App = {
 
                 case "LEAVE":
                 case "CALL_REJECT":
+                    this.clearCallTimeout();
                     this.sounds.stop();
+                    this.ui.hideOutgoingCall();
+                    this.ui.hideIncomingCall();
                     this.endCall();
                     break;
 
                 case "ERROR":
+                    this.clearCallTimeout();
                     this.sounds.stop();
+                    this.ui.hideOutgoingCall();
                     alert(data.message);
                     this.connectedUser = null;
                     break;
 
+                // MESAJLAŞMA
                 case "RECEIVE_MESSAGE":
                     if (this.activeChatTarget && this.activeChatTarget.toLowerCase() === data.payload.sender.toLowerCase()) {
                         this.ui.appendMessage(data.payload, this.username);
@@ -628,9 +669,14 @@ const App = {
 
                 case "CHAT_HISTORY_RESPONSE":
                     this.ui.renderChatHistory(data.payload.history, this.username);
-                    this.ui.chatHeaderStatus.innerText = data.payload.isOnline
-                        ? "Çevrimiçi"
-                        : (data.payload.lastSeen ? `Son görülme: ${formatTimeAgo(data.payload.lastSeen)}` : "Çevrimdışı");
+                    if (data.payload.isOnline) {
+                        this.ui.chatHeaderStatus.innerText = "Çevrimiçi";
+                        this.ui.chatHeaderStatus.className = "text-success small";
+                    } else {
+                        const lastSeenText = data.payload.lastSeen ? `Son görülme: ${formatTimeAgo(data.payload.lastSeen)}` : "Çevrimdışı";
+                        this.ui.chatHeaderStatus.innerText = lastSeenText;
+                        this.ui.chatHeaderStatus.className = "text-muted small";
+                    }
                     break;
 
                 case "MESSAGES_DELIVERED_NOTIFICATION":
@@ -677,12 +723,42 @@ const App = {
         }
     },
 
+    // ARAMAYI BAŞLATMA VE 30 SANİYELİK ZAMAN AŞIMI
     startCallProcess(targetUser, isAudioOnly = false) {
         if (!targetUser) return;
         this.connectedUser = targetUser;
         this.isAudioOnlyCall = isAudioOnly;
+
+        // Arayan Kişinin Ekranında "Aranıyor..." Modalını Göster
+        this.ui.showOutgoingCall(targetUser, isAudioOnly);
         this.sounds.playDialTone();
+
         this.send("CALL_REQUEST", { target: targetUser, isAudioOnly: isAudioOnly });
+
+        // 30 SANİYE CEVAP VERİLMEZSE OTOMATİK İPTAL ET
+        this.clearCallTimeout();
+        this.callTimeoutTimer = setTimeout(() => {
+            alert(`${targetUser} aramaya cevap vermedi.`);
+            this.cancelOutgoingCall();
+        }, 30000);
+    },
+
+    // ARAYAN KİŞİNİN ARAMAYI İPTAL ETMESİ
+    cancelOutgoingCall() {
+        this.clearCallTimeout();
+        this.sounds.stop();
+        this.ui.hideOutgoingCall();
+        if (this.connectedUser) {
+            this.send("CALL_REJECT", { target: this.connectedUser });
+            this.connectedUser = null;
+        }
+    },
+
+    clearCallTimeout() {
+        if (this.callTimeoutTimer) {
+            clearTimeout(this.callTimeoutTimer);
+            this.callTimeoutTimer = null;
+        }
     },
 
     bindEvents: function () {
@@ -706,6 +782,11 @@ const App = {
             this.startCallProcess(this.activeChatTarget, true);
         });
 
+        // ARAYAN İÇİN İPTAL BUTONU
+        document.getElementById('cancelCallBtn').addEventListener('click', () => {
+            this.cancelOutgoingCall();
+        });
+
         document.getElementById('tab-chats').addEventListener('click', () => {
             this.setActiveTab('tab-chats', 'view-chats');
             this.refreshRecentChats();
@@ -718,6 +799,7 @@ const App = {
         });
 
         document.getElementById('acceptBtn').addEventListener('click', async () => {
+            this.clearCallTimeout();
             this.sounds.stop();
             this.ui.hideIncomingCall();
             await this.rtc.startLocalStream(!this.isAudioOnlyCall);
@@ -726,6 +808,7 @@ const App = {
         });
 
         document.getElementById('rejectBtn').addEventListener('click', () => {
+            this.clearCallTimeout();
             this.sounds.stop();
             this.ui.hideIncomingCall();
             this.send("CALL_REJECT", { target: this.connectedUser });
@@ -733,6 +816,7 @@ const App = {
         });
 
         document.getElementById('hangUpBtn').addEventListener('click', () => {
+            this.clearCallTimeout();
             this.sounds.stop();
             this.send("LEAVE");
             this.endCall();
@@ -768,6 +852,7 @@ const App = {
     },
 
     endCall: function () {
+        this.clearCallTimeout();
         this.sounds.stop();
         this.ui.stopCallTimer();
         this.rtc.closeConnection();

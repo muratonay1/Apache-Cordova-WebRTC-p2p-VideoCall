@@ -449,6 +449,24 @@
             </div>
         </div>
 
+        <!-- EKRAN 4.5: ARAYAN İÇİN "ARANIYOR..." MODAL (YENİ EKLENDİ) -->
+        <div id="outgoingCallModal" class="call-screen-container position-absolute top-0 start-0 d-none">
+            <div class="text-center mt-5">
+                <div class="user-avatar mx-auto mb-3" style="width:120px; height:120px; font-size:3rem;">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <h3 class="fw-bold text-white mb-2" id="outgoingTargetNameDisplay">Bilinmeyen</h3>
+                <p class="text-success fs-5" id="outgoingCallTypeDisplay">Aranıyor...</p>
+            </div>
+
+            <div class="d-flex justify-content-center mb-5">
+                <button id="cancelCallBtn" class="btn-call-action danger" style="width: 65px; height: 65px;"
+                    title="Aramayı İptal Et">
+                    <i class="fa-solid fa-phone-slash fa-lg"></i>
+                </button>
+            </div>
+        </div>
+
         <!-- EKRAN 5: WEBRTC GÖRÜŞME EKRANI -->
         <div id="videoScreen" class="w-100 h-100 d-none position-relative">
             <div class="position-absolute top-0 start-0 m-3 z-3 bg-dark px-3 py-1 rounded-pill small border border-success"

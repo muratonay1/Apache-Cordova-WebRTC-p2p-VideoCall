@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.example.webrtc" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
+    <name>VideoChatApp</name>
+    <description>
+        WebRTC Modern Video Call Application
+    </description>
+    <author email="dev@example.com" href="http://example.com">
+        Developer
+    </author>
+    
+    <!-- Başlangıç sayfası www klasörü içindeki index.html'dir -->
+    <content src="index.html" />
+    
+    <!-- Dış bağlantılara ve WebSocket'lere izin ver -->
+    <access origin="*" />
+    <allow-navigation href="ws://*/*" />
+    <allow-navigation href="http://*/*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+
+    <!-- ANDROID İZİNLERİ VE AYARLARI -->
+    <platform name="android">
+        <!-- Kamera ve Mikrofon İzinleri -->
+        <config-file target="AndroidManifest.xml" parent="/*">
+            <uses-permission android:name="android.permission.CAMERA" />
+            <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+            <uses-permission android:name="android.permission.INTERNET" />
+        </config-file>
+        
+        <!-- Localhost WebSocket (ws://) bağlantısına izin veren Cleartext ayarı -->
+        <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
+            <application android:usesCleartextTraffic="true" />
+        </edit-config>
+    </platform>
+
+    <!-- IOS İZİNLERİ -->
+    <platform name="ios">
+        <config-file target="*-Info.plist" parent="NSCameraUsageDescription">
+            <string>Görüntülü konuşma için kamera erişimi gereklidir.</string>
+        </config-file>
+        <config-file target="*-Info.plist" parent="NSMicrophoneUsageDescription">
+            <string>Sesli iletişim için mikrofon erişimi gereklidir.</string>
+        </config-file>
+    </platform>
+</widget>

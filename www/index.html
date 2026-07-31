@@ -1,77 +1,435 @@
-<html>
+<!DOCTYPE html>
+<html lang="tr">
 
 <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; connect-src ws://node.ismetmuratonay.tk ws://node.ismetmuratonay.tk">
-    <meta name="format-detection" content="telephone=no">
-    <meta name="msapplication-tap-highlight" content="no">
-    <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css" />
-    <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
-    <link rel="stylesheet" type="text/css" href="css/index.css">
-    <title id="title">VideoChatApp</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src * data: gap: 'unsafe-eval' 'unsafe-inline'; style-src * 'unsafe-inline'; font-src * data:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * ws: wss:; media-src *;">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>VideoChat Pro</title>
+
+    <style>
+        :root {
+            --primary-neon: #00f2fe;
+            --accent-neon: #4facfe;
+            --pink-neon: #ff0844;
+            --card-bg: rgba(18, 22, 32, 0.95);
+            --card-border: rgba(0, 242, 254, 0.25);
+        }
+
+        body {
+            background: #0d111a;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            overflow: hidden;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .animated-bg {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            animation: float 18s ease-in-out infinite alternate;
+        }
+
+        .orb-1 {
+            width: 380px;
+            height: 380px;
+            background: #00f2fe;
+            top: -10%;
+            left: -10%;
+        }
+
+        .orb-2 {
+            width: 420px;
+            height: 420px;
+            background: #7f00ff;
+            bottom: -10%;
+            right: -10%;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 320px;
+            height: 320px;
+            background: #ff0844;
+            top: 35%;
+            left: 35%;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate(60px, 40px) scale(1.15);
+            }
+
+            100% {
+                transform: translate(-40px, 80px) scale(0.9);
+            }
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 242, 254, 0.15);
+            width: 100%;
+            max-width: 480px;
+            border-radius: 28px;
+            padding: 2rem;
+        }
+
+        @media (max-width: 576px) {
+            .glass-card {
+                max-width: 100%;
+                height: 100vh;
+                border-radius: 0;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                border: none;
+            }
+        }
+
+        .glass-input {
+            background: #080c14 !important;
+            border: 1.5px solid rgba(0, 242, 254, 0.4) !important;
+            color: #ffffff !important;
+            border-radius: 16px;
+            padding: 14px 18px;
+            font-weight: 500;
+        }
+
+        .glass-input::placeholder {
+            color: #94a3b8 !important;
+            opacity: 1 !important;
+        }
+
+        .btn-neon {
+            background: linear-gradient(135deg, var(--primary-neon), var(--accent-neon));
+            border: none;
+            color: #020617;
+            font-weight: 700;
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        /* GELEN ARAMA EKRANI */
+        .call-screen-container {
+            width: 100%;
+            height: 100vh;
+            background: #121620;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 80px 20px 60px 20px;
+            z-index: 100;
+        }
+
+        .avatar-circle {
+            width: 150px;
+            height: 150px;
+            background: #252d3d;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            margin-bottom: 24px;
+        }
+
+        /* GÖRÜŞME EKRANI VE ANLIK EKRAN DEĞİŞTİRME (SWAP) */
+        .main-video-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            background: #000;
+            cursor: pointer;
+        }
+
+        .main-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .pip-container {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            width: 110px;
+            height: 160px;
+            border-radius: 18px;
+            overflow: hidden;
+            border: 2px solid rgba(0, 242, 254, 0.6);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+            z-index: 10;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .pip-container:hover {
+            transform: scale(1.05);
+        }
+
+        .pip-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* ALT KONTROL BARI */
+        .bottom-control-bar {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(22, 27, 38, 0.92);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 40px;
+            padding: 10px 24px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            z-index: 20;
+            width: 90%;
+            max-width: 380px;
+            justify-content: space-around;
+        }
+
+        .btn-call-action {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            background: rgba(255, 255, 255, 0.12);
+            transition: all 0.2s;
+        }
+
+        .btn-call-action:active {
+            transform: scale(0.92);
+        }
+
+        .btn-call-action.danger {
+            background: var(--pink-neon);
+        }
+
+        .btn-call-action.success {
+            background: #22c55e;
+        }
+
+        /* ÜST STATUS BAR */
+        .top-status-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 30;
+            pointer-events: none;
+        }
+
+        .status-badge {
+            background: rgba(18, 22, 32, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--primary-neon);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .text-muted{
+            color: rgb(0 119 146) !important;
+        }
+    </style>
 </head>
 
-<body id="bodyStyle">
-    <div id="loginPage" class="container-text-center" style="position: absolute; top: 50%; left: 50%;transform: translate(-50%,-50%); ">
-        <div class="column">
-            <div class="col-md-4 col-md-offset-8">
-                <h2 style="color: white; text-decoration: underline; font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;text-shadow: yellow; font-size: xx-large;">Sign In</h2>
-                <input type="email" id="usernameInput" c lass="form-control formgroup" placeholder="Login" required="" autofocus="" style="height:50; width: 200; background-color: #17223b; color: white;">
-                <button id="loginBtn" class="loginBtn">
-                  Login</button>
+<body>
+
+    <div class="animated-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <!-- EKRAN 1: GİRİŞ -->
+    <div id="loginScreen" class="container d-flex justify-content-center align-items-center px-3 vh-100">
+        <div class="glass-card text-center">
+            <div class="mb-4">
+                <div class="d-inline-flex p-3 rounded-circle mb-3"
+                    style="background: rgba(0, 242, 254, 0.15); border: 1px solid var(--primary-neon);">
+                    <i class="fa-solid fa-bolt fa-2x text-info"></i>
+                </div>
+                <h3 class="fw-bold text-white mb-1">VideoChat Pro</h3>
+                <p class="text-light opacity-75 small">Sesli & Görüntülü İletişim</p>
+            </div>
+            <input type="text" id="usernameInput" class="form-control glass-input mb-4 text-center fs-5"
+                placeholder="Kullanıcı Adınız" autocomplete="off">
+            <button id="loginBtn" class="btn btn-neon btn-lg w-100 rounded-pill"><i
+                    class="fa-solid fa-arrow-right-to-bracket me-2"></i> Giriş Yap</button>
+        </div>
+    </div>
+
+    <!-- EKRAN 2: LOBİ -->
+    <div id="dialScreen" class="container d-none justify-content-center align-items-center px-3 vh-100">
+        <div class="glass-card">
+            <div
+                class="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom border-secondary border-opacity-50">
+                <div class="d-flex align-items-center gap-2">
+                    <span
+                        style="width:10px; height:10px; background:#22c55e; border-radius:50%; box-shadow:0 0 10px #22c55e;"></span>
+                    <span class="fw-bold fs-5 text-white" id="myUsernameDisplay">Kullanıcı</span>
+                </div>
+                <button id="logoutBtn" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i
+                        class="fa-solid fa-power-off me-1"></i> Çıkış</button>
+            </div>
+
+            <div class="mb-3">
+                <div class="input-group">
+                    <input id="callToUsernameInput" class="form-control glass-input" type="text"
+                        placeholder="Kullanıcı adı...">
+                    <button id="callVideoBtn" class="btn btn-neon px-3" title="Görüntülü Ara"><i
+                            class="fa-solid fa-video"></i></button>
+                    <button id="callAudioBtn" class="btn btn-outline-info px-3" title="Sesli Ara"><i
+                            class="fa-solid fa-phone"></i></button>
+                </div>
+            </div>
+
+            <ul class="nav nav-pills nav-fill mb-3" id="pills-tab">
+                <li class="nav-item">
+                    <button class="nav-link active py-2" id="tab-online">
+                        <i class="fa-solid fa-users me-1"></i> Çevrimiçi (<span id="onlineCountBadge">0</span>)
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link py-2" id="tab-history">
+                        <i class="fa-solid fa-clock-rotate-left me-1"></i> Geçmiş
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div id="view-online" class="tab-pane fade show active">
+                    <div id="onlineUsersList" style="max-height: 220px; overflow-y: auto;"></div>
+                </div>
+                <div id="view-history" class="tab-pane fade d-none">
+                    <div id="historyList" style="max-height: 220px; overflow-y: auto;"></div>
+                </div>
             </div>
         </div>
     </div>
-    <div id="callPage" class="call-page">
-        <div class="row">
-            <video id="localVideo" autoplay class="localVideoClass"></video>
-            <video id="remoteVideo" autoplay class="remoteVideoClass"></video>
-        </div>
-        <div class="row text-center">
-            <div class="col-md-12">
-                <input id="callToUsernameInput" type="text" placeholder="username to call" style="align-items: center; height: 40; width:200; top:-200;" />
-                <button id="callBtn" class="callBtn" style="width: 100;
-               height: 40;background-color: #25d366; align-items: center;">
-                  <p style="color: white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
-                     Call
-                  </p>
-               </button>
-                <button id="hangUpBtn" class="btn-danger btn" style="width: 100;
-               height: 40;background-color: red; align-items: center;">
-                  <p style="color:white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
-                     Hang Up
-                  </p>
-               </button>
-                <button id="StopCamera" class="btn-danger btn" style="width: 100;
-               height: 40;background-color: transparent; align-items: center;">
-                  <p id="CameraControlText" style="color: white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
-                  </p>
-               </button>
-                <button id="StartCamera" class="btn-danger btn" style="width: 100;
-               height: 40;background-color: transparent; align-items: center;">
-                  <p style="color: white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
-                     Start Cam
-                  </p>
-               </button>
-                <button id="BackToLoginPage" class="btn-danger btn" style="width: 100;
-               height: 40;background-color: transparent; align-items: center;">
-                  <p style="color: white; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; text-align: center;justify-content: center;align-items: center;">
-                     Back
-                  </p>
-               </button>
+
+    <!-- EKRAN 3: GELEN ARAMA MODAL -->
+    <div id="incomingCallModal" class="call-screen-container position-absolute top-0 start-0 d-none">
+        <div class="text-center mt-5">
+            <div class="avatar-circle mx-auto">
+                <i class="fa-solid fa-user text-light opacity-50" style="font-size: 70px;"></i>
             </div>
+            <h2 class="fw-bold text-white mb-2" id="callerNameDisplay">Bilinmeyen</h2>
+            <p class="text-info fs-5" id="callTypeDisplay">Görüntülü Arama...</p>
+        </div>
+
+        <div class="d-flex gap-5 mb-5">
+            <button id="rejectBtn" class="btn-call-action danger" style="width: 70px; height: 70px;">
+                <i class="fa-solid fa-phone-slash fa-xl"></i>
+            </button>
+            <button id="acceptBtn" class="btn-call-action success" style="width: 70px; height: 70px;">
+                <i class="fa-solid fa-phone fa-xl"></i>
+            </button>
         </div>
     </div>
+
+    <!-- EKRAN 4: GÖRÜŞME EKRANI (DİNAMİK VİDEO FLIP DESTEKLİ) -->
+    <div id="videoScreen" class="w-100 h-100 d-none position-relative">
+        <div class="top-status-bar">
+            <div id="callTimerBadge" class="status-badge">00:00</div>
+            <div id="remoteMicMutedBadge" class="status-badge bg-danger text-white border-0 d-none">
+                <i class="fa-solid fa-microphone-slash me-1"></i> Sessizde
+            </div>
+        </div>
+
+        <!-- ANA BÜYÜK VİDEO (DEĞİŞTİRİLEBİLİR) -->
+        <div class="main-video-container" id="mainVideoWrapper">
+            <video id="remoteVideo" autoplay playsinline class="main-video"></video>
+
+            <div id="remoteCameraOffOverlay"
+                class="position-absolute top-0 start-0 w-100 h-100 bg-dark d-none flex-column justify-content-center align-items-center z-2">
+                <div class="avatar-circle">
+                    <i class="fa-solid fa-user text-light opacity-50" style="font-size: 70px;"></i>
+                </div>
+                <h5 class="fw-bold text-white" id="remoteCamOffText">Kamera Kapalı</h5>
+            </div>
+        </div>
+
+        <!-- KÜÇÜK PIP VİDEO (TIKLANDIĞINDA BÜYÜKLE YER DEĞİŞTİRİR) -->
+        <div class="pip-container" id="pipVideoWrapper" title="Ekranları Yer Değiştir">
+            <video id="localVideo" autoplay playsinline muted class="pip-video"></video>
+            <div id="localCameraOffOverlay"
+                class="position-absolute top-0 start-0 w-100 h-100 bg-dark d-none flex-column justify-content-center align-items-center">
+                <i class="fa-solid fa-user-slash fa-lg text-light opacity-50"></i>
+            </div>
+        </div>
+
+        <!-- ALT KONTROL BARI -->
+        <div class="bottom-control-bar">
+            <button id="switchCamBtn" class="btn-call-action" title="Kamera Çevir">
+                <i class="fa-solid fa-camera-rotate fa-lg"></i>
+            </button>
+            <button id="toggleCamBtn" class="btn-call-action" title="Kamera Aç/Kapat">
+                <i class="fa-solid fa-video-slash fa-lg"></i>
+            </button>
+            <button id="toggleMicBtn" class="btn-call-action" title="Sessiz">
+                <i class="fa-solid fa-microphone fa-lg"></i>
+            </button>
+            <button id="hangUpBtn" class="btn-call-action danger" title="Aramayı Bitir">
+                <i class="fa-solid fa-phone-slash fa-lg"></i>
+            </button>
+        </div>
+    </div>
+
     <script type="text/javascript" src="cordova.js"></script>
     <script type="text/javascript" src="js/index.js"></script>
-    <!--İNCOMİNG CALL DİALOG DESİGN--------------------------------->
-    <div id="InComingModal" class="in-coming-page">
-        <h1 style="color:snow">
-            <span id="callerName"></span>
-        </h1>
-        <button id="kabulBtn" class="AcceptButton">Accept</button>
-        <button id="redBtn" class="DeclineButton">Decline</button>
-    </div>
-    <!--İNCOMİNG CALL DİALOG DESİGN--------------------------------->
 </body>
 
 </html>

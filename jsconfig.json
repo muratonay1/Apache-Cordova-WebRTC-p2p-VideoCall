@@ -1,0 +1,14 @@
+{
+     "compilerOptions": {
+          "checkJs": false,
+          "module": "ESNext",
+          "target": "ESNext",
+          "moduleResolution": "node",
+          "ignoreDeprecations": "6.0"
+     },
+     "exclude": ["node_modules"],
+     "include": [
+          "**/*.js",
+          "**/*.mjs"
+     ]
+}

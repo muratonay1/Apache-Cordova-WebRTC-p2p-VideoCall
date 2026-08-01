@@ -60,13 +60,12 @@ function sendCallHistory(ws) {
     }
 }
 
-// Arama geçmişine sesli mi görüntülü mü (isAudioOnly) bilgisi eklendi
 function addCallRecord(caller, receiver, status, isAudioOnly = false, duration = "00:00") {
     const record = {
         id: Date.now(),
         caller,
         receiver,
-        status, // 'COMPLETED', 'REJECTED', 'MISSED'
+        status,
         isAudioOnly,
         duration,
         timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
@@ -117,7 +116,6 @@ wss.on('connection', (ws, req) => {
 
                 ws.send(JSON.stringify({ type: "LOGIN_RESULT", success: true, username: rawUsername }));
 
-                // ONAY / TİK HESAPLAMASI: Çevrimdışı gelen mesajları DELIVERED (Çift Gri Tik) yap
                 const updatedSenders = new Set();
                 globalChatMessages.forEach(msg => {
                     if (msg.receiver.toLowerCase() === lowerUsername && msg.status === 'SENT') {
@@ -126,7 +124,6 @@ wss.on('connection', (ws, req) => {
                     }
                 });
 
-                // Mesaj gönderenlere "Teslim Edildi (Çift Tik)" bildirimi at
                 updatedSenders.forEach(senderKey => {
                     const senderWs = findUser(senderKey);
                     if (senderWs && senderWs.readyState === WebSocket.OPEN) {

@@ -17,53 +17,37 @@ function formatTimeAgo(timestamp) {
 
 class SoundEffects {
     constructor() {
-        // MP3 Zil Sesi (Aranan Kişi İçin)
         this.ringtone = new Audio('Ringtone/ringtone.mp3');
         this.ringtone.loop = true;
-
-        // Web Speech (Sesli Okuma) Sentezleyicisi
         this.synth = window.speechSynthesis || window.webkitSpeechSynthesis;
         this.speechInterval = null;
-
-        // Arayan Kişi İçin Bip Sesi (Dial Tone)
         this.ctx = null;
         this.dialInterval = null;
     }
 
-    // ARANAN KİŞİ İÇİN (Ahmet'in Ekranı): MP3 ÇAL VE "Murat arıyor" DE
     playRingtone(callerName) {
-        this.stop(); // Önceki tüm sesleri ve konuşmaları temizle
-
+        this.stop();
         this.ringtone.currentTime = 0;
-        this.ringtone.volume = 0.4; // Konuşmanın net duyulması için müziği biraz kısıyoruz
+        this.ringtone.volume = 0.4;
         this.ringtone.play().catch(err => console.log("Zil sesi izni bekleniyor:", err));
 
         if (callerName && this.synth) {
-            // İlk anonsu yap
             this.speakText(`${callerName} arıyor`);
-
-            // Her 4 saniyede bir akıcı şekilde tekrar et
             this.speechInterval = setInterval(() => {
                 this.speakText(`${callerName} arıyor`);
             }, 4000);
         }
     }
 
-    // ARAYAN KİŞİ İÇİN (Murat'ın Ekranı): "Ahmet aranıyor" DE VE BİP SESİ ÇAL
     playDialTone(targetName) {
-        this.stop(); // Önceki tüm sesleri ve konuşmaları temizle
-
-        // 1. "Ahmet aranıyor" Sesli Anonsunu Başlat (Aralıksız/Akıcı Ritim)
+        this.stop();
         if (targetName && this.synth) {
             this.speakText(`${targetName} aranıyor`);
-
-            // "Murat arıyor" ile birebir aynı ritimde (4 saniyede bir) düzenli tekrar et
             this.speechInterval = setInterval(() => {
                 this.speakText(`${targetName} aranıyor`);
             }, 4000);
         }
 
-        // 2. Bip (Dial Tone) Sesini Başlat
         if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (this.ctx.state === 'suspended') this.ctx.resume();
 
@@ -72,7 +56,7 @@ class SoundEffects {
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
             osc.frequency.setValueAtTime(440, this.ctx.currentTime);
-            gain.gain.setValueAtTime(0.05, this.ctx.currentTime); // Bip sesini konuşmayı bastırmaması için hafif kıstık
+            gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
             osc.connect(gain);
             gain.connect(this.ctx.destination);
             osc.start();
@@ -80,40 +64,31 @@ class SoundEffects {
         }, 3000);
     }
 
-    // KESİNTİSİZ METİN SESLENDİRME FONKSİYONU
     speakText(textToSpeak) {
         if (!this.synth) return;
-
-        // Eğer tarayıcı şu an konuşuyorsa çakışma olmaması için bitmesini bekle
         if (this.synth.speaking) {
             this.synth.cancel();
         }
-
         const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        utterance.lang = 'tr-TR'; // Türkçe seslendirme
-        utterance.rate = 1.0;     // Standart doğal konuşma hızı (Kesintiyi önler)
+        utterance.lang = 'tr-TR';
+        utterance.rate = 1.0;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
-
         this.synth.speak(utterance);
     }
 
-    // TÜM SESLERİ VE SESLİ OKUMALARI DURDUR
     stop() {
         if (this.ringtone) {
             this.ringtone.pause();
             this.ringtone.currentTime = 0;
         }
-
         if (this.synth) {
             this.synth.cancel();
         }
-
         if (this.speechInterval) {
             clearInterval(this.speechInterval);
             this.speechInterval = null;
         }
-
         if (this.dialInterval) {
             clearInterval(this.dialInterval);
             this.dialInterval = null;
@@ -163,23 +138,41 @@ class UIManager {
 
     switchState(state) {
         Object.values(this.screens).forEach(screen => {
-            if (screen) { screen.classList.add('d-none'); screen.classList.remove('d-flex'); }
+            if (screen) {
+                screen.classList.add('d-none');
+                screen.classList.remove('d-flex');
+            }
         });
 
         switch (state) {
-            case STATES.LOGGED_OUT: this.screens.login.classList.remove('d-none'); break;
-            case STATES.IDLE: this.screens.dial.classList.remove('d-none'); this.screens.dial.classList.add('d-flex'); break;
-            case STATES.IN_CALL: this.screens.video.classList.remove('d-none'); break;
+            case STATES.LOGGED_OUT:
+                this.screens.login.classList.remove('d-none');
+                this.screens.chat.classList.add('d-none');
+                break;
+            case STATES.IDLE:
+                this.screens.dial.classList.remove('d-none');
+                this.screens.dial.classList.add('d-flex');
+                if (window.innerWidth >= 992) {
+                    this.screens.chat.classList.remove('d-none');
+                }
+                break;
+            case STATES.IN_CALL:
+                this.screens.video.classList.remove('d-none');
+                break;
         }
     }
 
     openChatScreen(targetUsername) {
         this.chatHeaderTitle.innerText = targetUsername;
         this.screens.chat.classList.remove('d-none');
+        this.screens.chat.classList.remove('empty');
     }
 
     closeChatScreen() {
-        this.screens.chat.classList.add('d-none');
+        if (window.innerWidth < 992) {
+            this.screens.chat.classList.add('d-none');
+        }
+        this.screens.chat.classList.add('empty');
     }
 
     swapVideos() {
@@ -220,6 +213,7 @@ class UIManager {
         }
     }
 
+    // SOHBET LİSTESİ ROZET DÜZELTMESİ (WHATSAPP STİLİ DİNAMİK ROZET)
     renderRecentChats(chats, onOpenChat) {
         if (!this.recentChatsList) return;
         this.recentChatsList.innerHTML = '';
@@ -247,7 +241,7 @@ class UIManager {
                         <div style="font-size: 0.7rem;" class="text-muted">${timeAgo}</div>
                     </div>
                     <div class="d-flex justify-content-between align-items-center mt-1">
-                        <div class="text-muted small text-truncate" style="max-width: 200px;">${chat.lastMsg.text}</div>
+                        <div class="text-muted small text-truncate" style="max-width: 180px;">${chat.lastMsg.text}</div>
                         ${badgeHtml}
                     </div>
                 </div>
@@ -349,15 +343,20 @@ class UIManager {
         this.scrollToBottom();
     }
 
+    // TİK SİSTEMİ ÇÖZÜMÜ (READ -> TİCK-BLUE PARILTILI NEON)
     appendMessage(msg, currentUsername) {
         const isOutgoing = msg.sender === currentUsername;
         const timeStr = new Date(msg.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
         let tickHtml = '';
         if (isOutgoing) {
-            if (msg.status === 'SENT') tickHtml = '<i class="fa-solid fa-check ms-1"></i>';
-            else if (msg.status === 'DELIVERED') tickHtml = '<i class="fa-solid fa-check-double ms-1"></i>';
-            else if (msg.status === 'READ') tickHtml = '<i class="fa-solid fa-check-double ms-1 tick-blue"></i>';
+            if (msg.status === 'SENT') {
+                tickHtml = '<i class="fa-solid fa-check ms-1"></i>';
+            } else if (msg.status === 'DELIVERED') {
+                tickHtml = '<i class="fa-solid fa-check-double ms-1"></i>';
+            } else if (msg.status === 'READ') {
+                tickHtml = '<i class="fa-solid fa-check-double ms-1 tick-blue"></i>';
+            }
         }
 
         const div = document.createElement('div');
@@ -386,7 +385,6 @@ class UIManager {
         this.screens.incoming.classList.remove('d-flex');
     }
 
-    // ARAYAN KİŞİ İÇİN "ARANIYOR..." EKRANI
     showOutgoingCall(targetName, isAudioOnly = false) {
         this.outgoingTargetNameDisplay.innerText = targetName;
         this.outgoingCallTypeDisplay.innerText = isAudioOnly ? "Sesli Aranıyor..." : "Görüntülü Aranıyor...";
@@ -420,16 +418,13 @@ class WebRTCManager {
         this.peerConnection = null; this.localStream = null; this.iceCandidateQueue = [];
         this.currentFacingMode = "user";
         this.config = {
-            iceTransportPolicy: "all", // Hem doğrudan P2P hem TURN rölesini dene
+            iceTransportPolicy: "all",
             iceServers: [
-                // Google STUN Sunucuları (IP Tespiti İçin)
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:stun2.l.google.com:19302" },
                 { urls: "stun:stun3.l.google.com:19302" },
                 { urls: "stun:stun4.l.google.com:19302" },
-
-                // Güvenilir Açık TURN (Relay) Sunucuları (Mobil Veri Paket Geçişi İçin)
                 {
                     urls: [
                         "turn:openrelay.metered.ca:80",
@@ -634,7 +629,7 @@ const App = {
     rtc: null,
     sounds: new SoundEffects(),
     isAudioOnlyCall: false,
-    callTimeoutTimer: null, // 30 Saniyelik Zaman Aşımı Sayacı
+    callTimeoutTimer: null,
 
     init: function () {
         const isCordova = !!window.cordova;
@@ -654,17 +649,14 @@ const App = {
     connectWebSocket: function () {
         const isSecure = window.location.protocol === 'https:';
         const protocol = isSecure ? 'wss:' : 'ws:';
-
         let wsUrl = "";
 
-        // Ngrok veya dış HTTPS bağlantılarında PORT numarasını tamamen kaldırıyoruz
         if (window.location.hostname.includes('ngrok') || window.location.hostname.includes('dev') || isSecure) {
             wsUrl = `${protocol}//${window.location.host}`;
         } else {
             wsUrl = `${protocol}//${window.location.hostname}:8000`;
         }
 
-        console.log("WebSocket Bağlanılan Adres:", wsUrl);
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
@@ -681,7 +673,7 @@ const App = {
                 case "LOGIN_RESULT":
                     if (data.success) {
                         this.username = data.username;
-                        this.ui.myUsernameDisplay.innerText = this.username;
+                        this.setMyUsername(this.username);
                         this.ui.switchState(STATES.IDLE);
                         this.refreshRecentChats();
                     } else { alert(data.message); }
@@ -720,10 +712,7 @@ const App = {
                 case "INCOMING_CALL":
                     this.connectedUser = data.payload.caller;
                     this.isAudioOnlyCall = data.payload.isAudioOnly;
-
-                    // Arayanın İsmi İle Birlikte Zil Sesini ve İsim Okumayı Tetikle
                     this.sounds.playRingtone(this.connectedUser);
-
                     this.ui.showIncomingCall(this.connectedUser, this.isAudioOnlyCall);
                     break;
 
@@ -777,7 +766,6 @@ const App = {
                     this.connectedUser = null;
                     break;
 
-                // MESAJLAŞMA
                 case "RECEIVE_MESSAGE":
                     if (this.activeChatTarget && this.activeChatTarget.toLowerCase() === data.payload.sender.toLowerCase()) {
                         this.ui.appendMessage(data.payload, this.username);
@@ -849,23 +837,15 @@ const App = {
         }
     },
 
-    // ARAMAYI BAŞLATMA VE 30 SANİYELİK ZAMAN AŞIMI
-    // ARAMA BAŞLATMA VE 30 SANİYE CEVAP BEKLEME
     startCallProcess(targetUser, isAudioOnly = false) {
         if (!targetUser) return;
         this.connectedUser = targetUser;
         this.isAudioOnlyCall = isAudioOnly;
 
-        // 1. Murat'ın ekranında "Ahmet Aranıyor..." görselini göster
         this.ui.showOutgoingCall(targetUser, isAudioOnly);
-
-        // 2. Murat'ın cihazında sesli olarak "Ahmet aranıyor" de ve bip sesini başlat
         this.sounds.playDialTone(targetUser);
-
-        // 3. Sunucuya arama isteği gönder
         this.send("CALL_REQUEST", { target: targetUser, isAudioOnly: isAudioOnly });
 
-        // 4. 30 Saniye cevap verilmezse aramayı otomatik kapat
         this.clearCallTimeout();
         this.callTimeoutTimer = setTimeout(() => {
             alert(`${targetUser} aramaya cevap vermedi.`);
@@ -873,7 +853,6 @@ const App = {
         }, 30000);
     },
 
-    // ARAYAN KİŞİNİN ARAMAYI İPTAL ETMESİ
     cancelOutgoingCall() {
         this.clearCallTimeout();
         this.sounds.stop();
@@ -912,7 +891,6 @@ const App = {
             this.startCallProcess(this.activeChatTarget, true);
         });
 
-        // ARAYAN İÇİN İPTAL BUTONU
         document.getElementById('cancelCallBtn').addEventListener('click', () => {
             this.cancelOutgoingCall();
         });
@@ -967,18 +945,89 @@ const App = {
             this.send("MEDIA_STATE_CHANGE", { target: this.connectedUser, mediaType: 'video', enabled: isEnabled });
         });
 
-        document.getElementById('logoutBtn').addEventListener('click', () => location.reload());
+        const settingsBtn = document.getElementById('settingsBtn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                const settingsModal = document.getElementById('settingsModal');
+                if (settingsModal) {
+                    settingsModal.classList.remove('d-none');
+                    settingsModal.classList.add('d-flex');
+                }
+            });
+        }
+
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        if (closeSettingsBtn) {
+            closeSettingsBtn.addEventListener('click', () => {
+                const settingsModal = document.getElementById('settingsModal');
+                if (settingsModal) {
+                    settingsModal.classList.add('d-none');
+                    settingsModal.classList.remove('d-flex');
+                }
+            });
+        }
+
+        const settingsLogoutBtn = document.getElementById('settingsLogoutBtn');
+        if (settingsLogoutBtn) {
+            settingsLogoutBtn.addEventListener('click', () => {
+                document.getElementById('settingsModal').classList.add('d-none');
+                document.getElementById('settingsModal').classList.remove('d-flex');
+
+                const logoutModal = document.getElementById('logoutConfirmModal');
+                if (logoutModal) {
+                    logoutModal.classList.remove('d-none');
+                    logoutModal.classList.add('d-flex');
+                }
+            });
+        }
+
+        const cancelLogoutBtn = document.getElementById('cancelLogoutBtn');
+        if (cancelLogoutBtn) {
+            cancelLogoutBtn.addEventListener('click', () => {
+                const logoutModal = document.getElementById('logoutConfirmModal');
+                if (logoutModal) {
+                    logoutModal.classList.add('d-none');
+                    logoutModal.classList.remove('d-flex');
+                }
+            });
+        }
+
+        const confirmLogoutBtn = document.getElementById('confirmLogoutBtn');
+        if (confirmLogoutBtn) {
+            confirmLogoutBtn.addEventListener('click', () => {
+                location.reload();
+            });
+        }
+
+        document.getElementById('closeChatBtn').addEventListener('click', () => this.closeChat());
+    },
+
+    setMyUsername(username) {
+        if (this.ui.myUsernameDisplay) this.ui.myUsernameDisplay.innerText = username;
+        const avatarEl = document.getElementById('myUsernameAvatar');
+        if (avatarEl && username) {
+            avatarEl.innerText = username.charAt(0).toUpperCase();
+        }
     },
 
     setActiveTab: function (tabId, viewId) {
-        document.querySelectorAll('.wa-tab-item').forEach(el => el.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
+        document.querySelectorAll('.pulse-tab-item').forEach(el => {
+            el.classList.remove('active');
+        });
+
+        const selectedTab = document.getElementById(tabId);
+        if (selectedTab) {
+            selectedTab.classList.add('active');
+        }
 
         document.getElementById('view-chats').classList.add('d-none');
         document.getElementById('view-calls').classList.add('d-none');
         document.getElementById('view-contacts').classList.add('d-none');
 
-        document.getElementById(viewId).classList.remove('d-none');
+        const selectedView = document.getElementById(viewId);
+        if (selectedView) {
+            selectedView.classList.remove('d-none');
+        }
     },
 
     endCall: function () {

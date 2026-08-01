@@ -16,27 +16,109 @@ function formatTimeAgo(timestamp) {
 }
 
 class SoundEffects {
-    constructor() { this.ctx = null; this.interval = null; }
-    init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-    playDialTone() {
-        this.init(); this.stop();
-        this.interval = setInterval(() => {
+    constructor() {
+        // MP3 Zil Sesi (Aranan Kişi İçin)
+        this.ringtone = new Audio('Ringtone/ringtone.mp3');
+        this.ringtone.loop = true;
+
+        // Web Speech (Sesli Okuma) Sentezleyicisi
+        this.synth = window.speechSynthesis || window.webkitSpeechSynthesis;
+        this.speechInterval = null;
+
+        // Arayan Kişi İçin Bip Sesi (Dial Tone)
+        this.ctx = null;
+        this.dialInterval = null;
+    }
+
+    // ARANAN KİŞİ İÇİN (Ahmet'in Ekranı): MP3 ÇAL VE "Murat arıyor" DE
+    playRingtone(callerName) {
+        this.stop(); // Önceki tüm sesleri ve konuşmaları temizle
+
+        this.ringtone.currentTime = 0;
+        this.ringtone.volume = 0.4; // Konuşmanın net duyulması için müziği biraz kısıyoruz
+        this.ringtone.play().catch(err => console.log("Zil sesi izni bekleniyor:", err));
+
+        if (callerName && this.synth) {
+            // İlk anonsu yap
+            this.speakText(`${callerName} arıyor`);
+
+            // Her 4 saniyede bir akıcı şekilde tekrar et
+            this.speechInterval = setInterval(() => {
+                this.speakText(`${callerName} arıyor`);
+            }, 4000);
+        }
+    }
+
+    // ARAYAN KİŞİ İÇİN (Murat'ın Ekranı): "Ahmet aranıyor" DE VE BİP SESİ ÇAL
+    playDialTone(targetName) {
+        this.stop(); // Önceki tüm sesleri ve konuşmaları temizle
+
+        // 1. "Ahmet aranıyor" Sesli Anonsunu Başlat (Aralıksız/Akıcı Ritim)
+        if (targetName && this.synth) {
+            this.speakText(`${targetName} aranıyor`);
+
+            // "Murat arıyor" ile birebir aynı ritimde (4 saniyede bir) düzenli tekrar et
+            this.speechInterval = setInterval(() => {
+                this.speakText(`${targetName} aranıyor`);
+            }, 4000);
+        }
+
+        // 2. Bip (Dial Tone) Sesini Başlat
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        this.dialInterval = setInterval(() => {
             if (!this.ctx) return;
-            const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
-            osc.frequency.setValueAtTime(440, this.ctx.currentTime); gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-            osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 1.2);
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+            gain.gain.setValueAtTime(0.05, this.ctx.currentTime); // Bip sesini konuşmayı bastırmaması için hafif kıstık
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 1.0);
         }, 3000);
     }
-    playRingtone() {
-        this.init(); this.stop();
-        this.interval = setInterval(() => {
-            if (!this.ctx) return;
-            const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
-            osc.frequency.setValueAtTime(880, this.ctx.currentTime); gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-            osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.4);
-        }, 1500);
+
+    // KESİNTİSİZ METİN SESLENDİRME FONKSİYONU
+    speakText(textToSpeak) {
+        if (!this.synth) return;
+
+        // Eğer tarayıcı şu an konuşuyorsa çakışma olmaması için bitmesini bekle
+        if (this.synth.speaking) {
+            this.synth.cancel();
+        }
+
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance.lang = 'tr-TR'; // Türkçe seslendirme
+        utterance.rate = 1.0;     // Standart doğal konuşma hızı (Kesintiyi önler)
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        this.synth.speak(utterance);
     }
-    stop() { if (this.interval) { clearInterval(this.interval); this.interval = null; } }
+
+    // TÜM SESLERİ VE SESLİ OKUMALARI DURDUR
+    stop() {
+        if (this.ringtone) {
+            this.ringtone.pause();
+            this.ringtone.currentTime = 0;
+        }
+
+        if (this.synth) {
+            this.synth.cancel();
+        }
+
+        if (this.speechInterval) {
+            clearInterval(this.speechInterval);
+            this.speechInterval = null;
+        }
+
+        if (this.dialInterval) {
+            clearInterval(this.dialInterval);
+            this.dialInterval = null;
+        }
+    }
 }
 
 class UIManager {
@@ -638,7 +720,10 @@ const App = {
                 case "INCOMING_CALL":
                     this.connectedUser = data.payload.caller;
                     this.isAudioOnlyCall = data.payload.isAudioOnly;
-                    this.sounds.playRingtone();
+
+                    // Arayanın İsmi İle Birlikte Zil Sesini ve İsim Okumayı Tetikle
+                    this.sounds.playRingtone(this.connectedUser);
+
                     this.ui.showIncomingCall(this.connectedUser, this.isAudioOnlyCall);
                     break;
 
@@ -765,18 +850,22 @@ const App = {
     },
 
     // ARAMAYI BAŞLATMA VE 30 SANİYELİK ZAMAN AŞIMI
+    // ARAMA BAŞLATMA VE 30 SANİYE CEVAP BEKLEME
     startCallProcess(targetUser, isAudioOnly = false) {
         if (!targetUser) return;
         this.connectedUser = targetUser;
         this.isAudioOnlyCall = isAudioOnly;
 
-        // Arayan Kişinin Ekranında "Aranıyor..." Modalını Göster
+        // 1. Murat'ın ekranında "Ahmet Aranıyor..." görselini göster
         this.ui.showOutgoingCall(targetUser, isAudioOnly);
-        this.sounds.playDialTone();
 
+        // 2. Murat'ın cihazında sesli olarak "Ahmet aranıyor" de ve bip sesini başlat
+        this.sounds.playDialTone(targetUser);
+
+        // 3. Sunucuya arama isteği gönder
         this.send("CALL_REQUEST", { target: targetUser, isAudioOnly: isAudioOnly });
 
-        // 30 SANİYE CEVAP VERİLMEZSE OTOMATİK İPTAL ET
+        // 4. 30 Saniye cevap verilmezse aramayı otomatik kapat
         this.clearCallTimeout();
         this.callTimeoutTimer = setTimeout(() => {
             alert(`${targetUser} aramaya cevap vermedi.`);

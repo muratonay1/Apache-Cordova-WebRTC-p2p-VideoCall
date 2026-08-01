@@ -2,3 +2,4 @@ node_modules
 plugins
 platforms
 package-lock.json
+.env

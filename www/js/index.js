@@ -338,9 +338,35 @@ class WebRTCManager {
         this.peerConnection = null; this.localStream = null; this.iceCandidateQueue = [];
         this.currentFacingMode = "user";
         this.config = {
+            iceTransportPolicy: "all", // Hem doğrudan P2P hem TURN rölesini dene
             iceServers: [
+                // Google STUN Sunucuları (IP Tespiti İçin)
                 { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" }
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:stun2.l.google.com:19302" },
+                { urls: "stun:stun3.l.google.com:19302" },
+                { urls: "stun:stun4.l.google.com:19302" },
+
+                // Güvenilir Açık TURN (Relay) Sunucuları (Mobil Veri Paket Geçişi İçin)
+                {
+                    urls: [
+                        "turn:openrelay.metered.ca:80",
+                        "turn:openrelay.metered.ca:443",
+                        "turn:openrelay.metered.ca:443?transport=tcp"
+                    ],
+                    username: "openrelay",
+                    credential: "openrelay"
+                },
+                {
+                    urls: [
+                        "stun:stun.relay.metered.ca:80",
+                        "turn:global.relay.metered.ca:80",
+                        "turn:global.relay.metered.ca:443",
+                        "turn:global.relay.metered.ca:443?transport=tcp"
+                    ],
+                    username: "openrelay",
+                    credential: "openrelay"
+                }
             ]
         };
     }
@@ -544,13 +570,28 @@ const App = {
     },
 
     connectWebSocket: function () {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        const wsUrl = window.location.href.includes('ngrok')
-            ? `${protocol}//${host}`
-            : `${protocol}//${host}:8000`;
+        const isSecure = window.location.protocol === 'https:';
+        const protocol = isSecure ? 'wss:' : 'ws:';
 
+        let wsUrl = "";
+
+        // Ngrok veya dış HTTPS bağlantılarında PORT numarasını tamamen kaldırıyoruz
+        if (window.location.hostname.includes('ngrok') || window.location.hostname.includes('dev') || isSecure) {
+            wsUrl = `${protocol}//${window.location.host}`;
+        } else {
+            wsUrl = `${protocol}//${window.location.hostname}:8000`;
+        }
+
+        console.log("WebSocket Bağlanılan Adres:", wsUrl);
         this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+            console.log("WebSocket Sunucusuna Başarıyla Bağlanıldı!");
+        };
+
+        this.ws.onerror = (err) => {
+            console.error("WebSocket Bağlantı Hatası:", err);
+        };
 
         this.ws.onmessage = async (msg) => {
             const data = JSON.parse(msg.data);
